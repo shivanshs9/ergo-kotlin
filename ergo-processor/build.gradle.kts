@@ -5,7 +5,10 @@ plugins {
 dependencies {
     implementation(kotlin("stdlib-jdk8"))
     implementation(project(":ergo-annotations"))
-    implementation("com.google.auto.service:auto-service:1.0-rc7")
+    implementation(rootProject.ext["deps.auto"] as String)
+    annotationProcessor(rootProject.ext["deps.auto"] as String)
+    implementation(rootProject.ext["deps.kotlin-metadata"] as String)
+    implementation(rootProject.ext["deps.kotlinpoet"] as String)
 }
 
 tasks {

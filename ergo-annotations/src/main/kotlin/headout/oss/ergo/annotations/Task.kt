@@ -6,4 +6,4 @@ package headout.oss.ergo.annotations
 
 @Retention(AnnotationRetention.SOURCE)
 @Target(AnnotationTarget.FUNCTION)
-annotation class Task (val taskId: String)
+annotation class Task (val taskId: String, val retryOnFail: Boolean = false)
