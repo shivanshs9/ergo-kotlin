@@ -12,7 +12,6 @@ import javax.lang.model.element.Element
 import javax.lang.model.element.ElementKind
 import javax.lang.model.element.ExecutableElement
 import javax.lang.model.element.TypeElement
-import javax.lang.model.type.TypeVariable
 import javax.tools.Diagnostic
 
 /**
@@ -57,13 +56,7 @@ class TaskProcessor : KotlinAbstractProcessor() {
         val annotation = element.getAnnotation(ANNOTATION_TYPE)
         val returnType = element.returnType
 
-        val parameters = element.parameters.map {
-            var parameterType = it.asType()
-            if (parameterType is TypeVariable) {
-                parameterType = parameterType.upperBound
-            }
-            MethodParameter(parameterType.asTypeName())
-        }
+        val parameters = element.parameters.map { MethodParameter(it) }
 
         val methodBinder = MethodSignature(methodName, parameters, returnType.asTypeName())
         val builder = builderMap.attachElement(classElement)

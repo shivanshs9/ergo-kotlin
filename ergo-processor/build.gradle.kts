@@ -5,6 +5,7 @@ plugins {
 dependencies {
     implementation(kotlin("stdlib-jdk8"))
     implementation(project(":ergo-annotations"))
+    implementation(project(":ergo"))
     implementation(rootProject.ext["deps.auto"] as String)
     annotationProcessor(rootProject.ext["deps.auto"] as String)
     implementation(rootProject.ext["deps.kotlin-metadata"] as String)

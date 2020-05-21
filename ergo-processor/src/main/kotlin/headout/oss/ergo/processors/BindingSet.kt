@@ -8,6 +8,7 @@ import javax.lang.model.element.*
  * Created by shivanshs9 on 20/05/20.
  */
 class BindingSet internal constructor(
+    val enclosingElement: TypeElement,
     val targetType: TypeName,
     val bindingClassName: ClassName,
     val isFinal: Boolean,
@@ -22,9 +23,19 @@ class BindingSet internal constructor(
 
     private fun createType(): TypeSpec = TypeSpec.classBuilder(bindingClassName.simpleName)
         .addModifiers(KModifier.PUBLIC)
+        .addOriginatingElement(enclosingElement)
+        .apply {
+            if (isFinal) addModifiers(KModifier.FINAL)
+            addFunctions(createFunctions())
+        }
         .build()
 
+    private fun createFunctions(): List<FunSpec> = tasks.map {
+        it.createFunctionSpec()
+    }
+
     class Builder internal constructor(
+        private val enclosingElement: TypeElement,
         private val targetType: TypeName,
         private val bindingClassName: ClassName,
         private val isFinal: Boolean
@@ -40,7 +51,7 @@ class BindingSet internal constructor(
 
         fun build(): BindingSet {
             val tasks = taskBuilders.map { it.build() }
-            return BindingSet(targetType, bindingClassName, isFinal, tasks)
+            return BindingSet(enclosingElement, targetType, bindingClassName, isFinal, tasks)
         }
     }
 
@@ -51,7 +62,7 @@ class BindingSet internal constructor(
 
             val bindingClassName = enclosingElement.getBindingClassName()
             val isFinal = enclosingElement.modifiers.contains(Modifier.FINAL)
-            return Builder(typeName, bindingClassName, isFinal)
+            return Builder(enclosingElement, typeName, bindingClassName, isFinal)
         }
     }
 }
