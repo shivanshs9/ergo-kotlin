@@ -1,28 +1,47 @@
 package headout.oss.ergo.processors
 
-import com.squareup.kotlinpoet.FunSpec
-import com.squareup.kotlinpoet.ParameterSpec
+import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.plusParameter
-import com.squareup.kotlinpoet.TypeName
-import com.squareup.kotlinpoet.asTypeName
 import headout.oss.ergo.annotations.Task
-import headout.oss.ergo.listeners.JobCallback
-import headout.oss.ergo.utils.belongsToType
+import headout.oss.ergo.models.EmptyRequestData
+import headout.oss.ergo.models.JobRequest
+import headout.oss.ergo.utils.getFromConstructor
 
 /**
  * Created by shivanshs9 on 20/05/20.
  */
 class TaskBinder internal constructor(val methodName: String, val task: Task, val method: MethodSignature) {
-    fun createFunctionSpec(): FunSpec = FunSpec.builder(methodName)
-        .apply {
-            if (method.parameters.find { it.type.belongsToType(JobCallback::class) } == null) {
-                addParameter(PARAM_NAME_CALLBACK, getCallbackType(method.returnType))
-            }
-        }
-        .addParameters(method.parameters.map { ParameterSpec.get(it.variableElement) })
+    private lateinit var requestDataClassName: ClassName
+
+    fun createFunctionSpec(packageName: String): FunSpec = createRequestClassName(packageName).let {
+        FunSpec.builder(methodName)
+            .addParameter(PARAM_NAME_REQUEST, getRequestType(requestDataClassName))
+            .addParameter(PARAM_NAME_CALLBACK, method.callbackType)
+            .build()
+    }
+
+    fun createRequestDataSpec(): TypeSpec = TypeSpec.classBuilder(requestDataClassName)
+        .addModifiers(KModifier.DATA)
+        .primaryConstructor(
+            FunSpec.constructorBuilder()
+                .addParameters(method.targetParameters.map { ParameterSpec.get(it.variableElement) })
+                .build()
+        )
+        .addProperties(method.targetParameters.map {
+            PropertySpec.getFromConstructor(it.name, it.typeName)
+        })
         .build()
 
-    private fun getCallbackType(type: TypeName): TypeName = JobCallback::class.asTypeName().plusParameter(type)
+    fun isRequestDataNeeded() = method.targetParameters.isNotEmpty()
+
+    private fun createRequestClassName(packageName: String): ClassName =
+        (method.targetParameters.takeIf { it.isNotEmpty() }?.let {
+            ClassName(packageName, "$PREFIX_CLASS_REQUEST_DATA$methodName")
+        } ?: EmptyRequestData::class.asClassName()).also {
+            requestDataClassName = it
+        }
+
+    private fun getRequestType(type: TypeName): TypeName = JobRequest::class.asTypeName().plusParameter(type)
 
     class Builder internal constructor(val task: Task) {
         var methodSignature: MethodSignature? = null
@@ -35,7 +54,9 @@ class TaskBinder internal constructor(val methodName: String, val task: Task, va
     }
 
     companion object {
+        const val PREFIX_CLASS_REQUEST_DATA = "RequestData_"
         const val PARAM_NAME_CALLBACK = "jobCallback"
+        const val PARAM_NAME_REQUEST = "jobRequest"
 
         fun newBuilder(task: Task) = Builder(task)
 

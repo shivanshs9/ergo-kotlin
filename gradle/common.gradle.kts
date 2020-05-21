@@ -4,4 +4,3 @@ version = VERSION_NAME
 group = "headout.oss"
 
 fun isReleaseBuild() = !VERSION_NAME.contains("SNAPSHOT")
-

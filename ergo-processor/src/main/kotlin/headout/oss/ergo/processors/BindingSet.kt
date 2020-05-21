@@ -2,6 +2,7 @@ package headout.oss.ergo.processors
 
 import com.squareup.kotlinpoet.*
 import headout.oss.ergo.annotations.Task
+import headout.oss.ergo.factory.BaseTaskController
 import javax.lang.model.element.*
 
 /**
@@ -17,6 +18,11 @@ class BindingSet internal constructor(
     fun brewKotlin(): FileSpec = createType().let { type ->
         FileSpec.builder(bindingClassName.packageName, type.name!!)
             .addType(type)
+            .apply {
+                tasks.forEach {
+                    if (it.isRequestDataNeeded()) addType(it.createRequestDataSpec())
+                }
+            }
             .addComment("Generated code by Ergo. DO NOT MODIFY!!")
             .build()
     }
@@ -24,15 +30,14 @@ class BindingSet internal constructor(
     private fun createType(): TypeSpec = TypeSpec.classBuilder(bindingClassName.simpleName)
         .addModifiers(KModifier.PUBLIC)
         .addOriginatingElement(enclosingElement)
+        .superclass(BaseTaskController::class)
         .apply {
             if (isFinal) addModifiers(KModifier.FINAL)
             addFunctions(createFunctions())
         }
         .build()
 
-    private fun createFunctions(): List<FunSpec> = tasks.map {
-        it.createFunctionSpec()
-    }
+    private fun createFunctions() = tasks.map { it.createFunctionSpec(bindingClassName.packageName) }
 
     class Builder internal constructor(
         private val enclosingElement: TypeElement,
@@ -69,7 +74,7 @@ class BindingSet internal constructor(
 
 private fun TypeElement.getBindingClassName(): ClassName {
     val packageName = packageElement.qualifiedName.toString()
-    val className = qualifiedName.toString().substring(packageName.length + 1)
+    val className = qualifiedName.toString().substring(packageName.length)
         .replace('.', '$') // since .simpleName is unreliable and sometimes blank
     return ClassName(packageName, "${className}_TaskBinding")
 }
