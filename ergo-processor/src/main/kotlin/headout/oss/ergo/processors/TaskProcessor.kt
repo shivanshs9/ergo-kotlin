@@ -8,10 +8,7 @@ import java.io.IOException
 import javax.annotation.processing.Processor
 import javax.annotation.processing.RoundEnvironment
 import javax.lang.model.SourceVersion
-import javax.lang.model.element.Element
-import javax.lang.model.element.ElementKind
-import javax.lang.model.element.ExecutableElement
-import javax.lang.model.element.TypeElement
+import javax.lang.model.element.*
 import javax.tools.Diagnostic
 
 /**
@@ -23,13 +20,26 @@ class TaskProcessor : KotlinAbstractProcessor() {
 
     override fun process(annotations: Set<TypeElement>, roundEnv: RoundEnvironment): Boolean {
         val bindingMap = processTargets(roundEnv)
-        bindingMap.forEach {binding ->
+        bindingMap.forEach { binding ->
             binding.value.runCatching {
                 brewKotlin().writeTo(filer)
             }.onFailure {
+                it.printStackTrace()
                 when (it) {
-                    is IOException -> error(it, binding.key, "Unable to write binding for type %s: %s", binding.key, it.localizedMessage)
-                    else -> error(it, binding.key, "Encountered unknown error processing %s: %s", binding.key, it.localizedMessage)
+                    is IOException -> error(
+                        it,
+                        binding.key,
+                        "Unable to write binding for type %s: %s",
+                        binding.key.toString(),
+                        it.localizedMessage ?: it.message ?: it.toString()
+                    )
+                    else -> error(
+                        it,
+                        binding.key,
+                        "Encountered unknown error processing %s: %s",
+                        binding.key.toString(),
+                        it.localizedMessage ?: it.message ?: it.toString()
+                    )
                 }
             }
         }
@@ -58,9 +68,16 @@ class TaskProcessor : KotlinAbstractProcessor() {
 
         val parameters = element.parameters.map { MethodParameter(it) }
 
-        val methodBinder = MethodSignature(methodName, parameters, returnType.asTypeName())
-        val builder = builderMap.attachElement(classElement)
-        builder.addMethod(annotation, methodBinder)
+        println("METHOD MODIFIERS == ${element.modifiers}")
+        val methodSignature = MethodSignature(
+            methodName,
+            parameters,
+            returnType.asTypeName(),
+            isStatic = element.modifiers.contains(Modifier.STATIC)
+        )
+        builderMap.attachElement(classElement).apply {
+            addMethod(annotation, methodSignature)
+        }
     }
 
     override fun getSupportedSourceVersion(): SourceVersion = SourceVersion.latest()

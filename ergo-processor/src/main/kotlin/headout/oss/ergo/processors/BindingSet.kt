@@ -37,18 +37,17 @@ class BindingSet internal constructor(
         }
         .build()
 
-    private fun createFunctions() = tasks.map { it.createFunctionSpec(bindingClassName.packageName) }
+    private fun createFunctions() = tasks.map { it.createFunctionSpec() }
 
     class Builder internal constructor(
         private val enclosingElement: TypeElement,
-        private val targetType: TypeName,
-        private val bindingClassName: ClassName,
         private val isFinal: Boolean
     ) {
+        private val targetType by lazy { enclosingElement.asClassName() }
         private val taskBuilders: MutableSet<TaskBinder.Builder> = mutableSetOf()
 
         fun addMethod(task: Task, methodSignature: MethodSignature): Boolean {
-            val taskBuilder = TaskBinder.newBuilder(task).apply {
+            val taskBuilder = TaskBinder.newBuilder(task, targetType).apply {
                 this.methodSignature = methodSignature
             }.also { taskBuilders.add(it) }
             return true
@@ -56,25 +55,22 @@ class BindingSet internal constructor(
 
         fun build(): BindingSet {
             val tasks = taskBuilders.map { it.build() }
-            return BindingSet(enclosingElement, targetType, bindingClassName, isFinal, tasks)
+            return BindingSet(enclosingElement, targetType, enclosingElement.getBindingClassName(), isFinal, tasks)
         }
     }
 
     companion object {
         fun newBuilder(enclosingElement: TypeElement): Builder {
-            var typeName = enclosingElement.asType().asTypeName()
-            if (typeName is ParameterizedTypeName) typeName = typeName.rawType
-
-            val bindingClassName = enclosingElement.getBindingClassName()
+            println("CLASS MODIFIERS == ${enclosingElement.modifiers}")
             val isFinal = enclosingElement.modifiers.contains(Modifier.FINAL)
-            return Builder(enclosingElement, typeName, bindingClassName, isFinal)
+            return Builder(enclosingElement, isFinal)
         }
     }
 }
 
 private fun TypeElement.getBindingClassName(): ClassName {
     val packageName = packageElement.qualifiedName.toString()
-    val className = qualifiedName.toString().substring(packageName.length)
+    val className = qualifiedName.toString().substring(packageName.length + 1)
         .replace('.', '$') // since .simpleName is unreliable and sometimes blank
     return ClassName(packageName, "${className}_TaskBinding")
 }

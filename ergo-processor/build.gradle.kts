@@ -9,7 +9,13 @@ dependencies {
     implementation(rootProject.ext["deps.auto"] as String)
     annotationProcessor(rootProject.ext["deps.auto"] as String)
     implementation(rootProject.ext["deps.kotlin-metadata"] as String)
+    implementation(rootProject.ext["deps.kotlinpoet-metadata"] as String)
     implementation(rootProject.ext["deps.kotlinpoet"] as String)
+
+    testImplementation(rootProject.ext["deps.kotlin-metadata"] as String)
+    testImplementation(rootProject.ext["deps.truth"] as String)
+    testImplementation(rootProject.ext["deps.junit"] as String)
+    testImplementation(rootProject.ext["deps.compile-testing"] as String)
 }
 
 tasks {
