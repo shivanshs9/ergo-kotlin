@@ -127,7 +127,7 @@ class TaskProcessor : KotlinAbstractProcessor() {
                 val controllerClass = controllerBind.bindingClassName
                 controllerBind.tasks.forEach { taskBind ->
                     val requestDataClass = taskBind.requestDataClassName
-                    val resultClass = taskBind.method.returnType
+                    val resultClass = taskBind.method.callbackType
                     val paramControllerClass = controllerClass.parameterizedBy(requestDataClass, resultClass)
                     addStatement(
                         "%S -> %T(%N, %N, %N as %T)",

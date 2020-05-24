@@ -6,7 +6,6 @@ import headout.oss.ergo.annotations.Task
 import headout.oss.ergo.annotations.TaskId
 import headout.oss.ergo.exceptions.ExceptionUtils
 import headout.oss.ergo.factory.BaseTaskController
-import headout.oss.ergo.listeners.JobCallback
 import headout.oss.ergo.models.JobId
 import headout.oss.ergo.models.JobRequest
 import headout.oss.ergo.models.JobRequestData
@@ -78,7 +77,6 @@ class BindingSet internal constructor(
         .beginControlFlow("return when (taskId)")
         .apply {
             val jobRequestClass = JobRequest::class.asClassName()
-            val jobCallbackClass = JobCallback::class.asClassName()
             tasks.forEach {
                 addStatement(
                     "%S -> %N(%N as %T, %N as %T)",
@@ -87,7 +85,7 @@ class BindingSet internal constructor(
                     "arg0",
                     jobRequestClass.parameterizedBy(it.requestDataClassName),
                     "arg1",
-                    jobCallbackClass.parameterizedBy(it.method.returnType)
+                    it.method.callbackType
                 )
             }
             addStatement("else -> %M($PARAM_TASKID)", MemberName(ExceptionUtils::class.asClassName(), "taskNotFound"))
