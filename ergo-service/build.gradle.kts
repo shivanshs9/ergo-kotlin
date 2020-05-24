@@ -1,5 +1,11 @@
 plugins {
     kotlin("jvm") version "1.3.72"
+    kotlin("kapt") version "1.3.72"
+    kotlin("plugin.serialization") version "1.3.72"
+}
+
+kapt {
+    generateStubs = true
 }
 
 dependencies {
@@ -8,7 +14,7 @@ dependencies {
     implementation(rootProject.ext["deps.coroutine"] as String)
 
     implementation(project(":ergo-runtime"))
-    annotationProcessor(project(":ergo-processor"))
+    kapt(project(":ergo-processor"))
 }
 
 tasks {
