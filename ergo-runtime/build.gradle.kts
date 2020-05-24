@@ -1,9 +1,12 @@
 plugins {
     kotlin("jvm") version "1.3.72"
+    kotlin("plugin.serialization") version "1.3.70"
 }
 
 dependencies {
     implementation(kotlin("stdlib-jdk8"))
+    implementation(rootProject.ext["deps.serialization"] as String)
+    implementation(rootProject.ext["deps.coroutine"] as String)
     api(project(":ergo-annotations"))
 
     testImplementation(project(":ergo-processor"))

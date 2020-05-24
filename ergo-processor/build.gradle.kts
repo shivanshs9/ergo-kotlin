@@ -4,6 +4,7 @@ plugins {
 
 dependencies {
     implementation(kotlin("stdlib-jdk8"))
+    api(rootProject.ext["deps.serialization"] as String)
     implementation(project(":ergo-annotations"))
     implementation(project(":ergo-runtime"))
     implementation(rootProject.ext["deps.auto"] as String)

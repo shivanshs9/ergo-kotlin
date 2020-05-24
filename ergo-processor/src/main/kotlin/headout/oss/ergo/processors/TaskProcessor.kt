@@ -4,6 +4,7 @@ import com.google.auto.service.AutoService
 import com.squareup.kotlinpoet.asTypeName
 import headout.oss.ergo.annotations.Task
 import me.eugeniomarletti.kotlin.processing.KotlinAbstractProcessor
+import me.eugeniomarletti.kotlin.processing.KotlinProcessingEnvironment
 import java.io.IOException
 import javax.annotation.processing.Processor
 import javax.annotation.processing.RoundEnvironment
@@ -75,7 +76,7 @@ class TaskProcessor : KotlinAbstractProcessor() {
             returnType.asTypeName(),
             isStatic = element.modifiers.contains(Modifier.STATIC)
         )
-        builderMap.attachElement(classElement).apply {
+        builderMap.attachElement(classElement, this).apply {
             addMethod(annotation, methodSignature)
         }
     }
@@ -101,5 +102,8 @@ class TaskProcessor : KotlinAbstractProcessor() {
     }
 }
 
-private fun MutableMap<TypeElement, BindingSet.Builder>.attachElement(enclosingElement: TypeElement) =
-    getOrPut(enclosingElement) { BindingSet.newBuilder(enclosingElement) }
+private fun MutableMap<TypeElement, BindingSet.Builder>.attachElement(
+    enclosingElement: TypeElement,
+    processingEnvironment: KotlinProcessingEnvironment
+) =
+    getOrPut(enclosingElement) { BindingSet.newBuilder(enclosingElement, processingEnvironment) }

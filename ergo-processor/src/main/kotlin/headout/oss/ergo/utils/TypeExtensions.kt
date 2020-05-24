@@ -5,10 +5,14 @@ import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import me.eugeniomarletti.kotlin.metadata.shadow.name.FqName
 import me.eugeniomarletti.kotlin.metadata.shadow.platform.JavaToKotlinClassMap
 import javax.lang.model.element.Element
+import javax.lang.model.element.ElementKind
+import javax.lang.model.element.ExecutableElement
 import javax.lang.model.element.TypeElement
 import javax.lang.model.type.DeclaredType
 import javax.lang.model.type.TypeMirror
+import javax.lang.model.util.Elements
 import kotlin.reflect.KClass
+import kotlin.reflect.KFunction
 
 /**
  * Created by shivanshs9 on 21/05/20.
@@ -65,3 +69,7 @@ fun TypeName.javaToKotlinType(): TypeName = when (this) {
         else ClassName.bestGuess(className)
     }
 }
+
+fun KClass<*>.getExecutableElement(function: KFunction<*>, elements: Elements): ExecutableElement? =
+    elements.getAllMembers(elements.getTypeElement(qualifiedName))
+        .find { it.kind == ElementKind.METHOD && it.simpleName.contentEquals(function.name) } as? ExecutableElement

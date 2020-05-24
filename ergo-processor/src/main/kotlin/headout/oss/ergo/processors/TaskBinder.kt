@@ -8,6 +8,7 @@ import headout.oss.ergo.models.EmptyRequestData
 import headout.oss.ergo.models.JobRequest
 import headout.oss.ergo.models.JobRequestData
 import headout.oss.ergo.utils.getFromConstructor
+import kotlinx.serialization.Serializable
 
 /**
  * Created by shivanshs9 on 20/05/20.
@@ -47,6 +48,7 @@ class TaskBinder internal constructor(
 
     fun createRequestDataSpec(): TypeSpec = TypeSpec.classBuilder(requestDataClassName)
         .addSuperinterface(JobRequestData::class)
+        .addAnnotation(Serializable::class)
         .addModifiers(KModifier.DATA)
         .primaryConstructor(
             FunSpec.constructorBuilder()
