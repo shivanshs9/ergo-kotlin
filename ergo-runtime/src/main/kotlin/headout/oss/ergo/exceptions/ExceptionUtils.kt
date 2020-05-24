@@ -1,5 +1,7 @@
 package headout.oss.ergo.exceptions
 
+import headout.oss.ergo.annotations.TaskId
+
 /**
  * Created by shivanshs9 on 24/05/20.
  */
@@ -23,4 +25,7 @@ object ExceptionUtils {
             throw errorHandler(exc)
         }
     }
+
+    fun taskNotFound(taskId: TaskId): Nothing =
+        throw TaskNotFoundError(msg = "Could not find relevant function for the taskId - '$taskId'")
 }

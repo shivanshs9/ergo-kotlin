@@ -19,7 +19,7 @@ class TaskBinder internal constructor(
     val method: MethodSignature,
     val targetClassName: ClassName
 ) {
-    private val requestDataClassName by lazy {
+    val requestDataClassName by lazy {
         if (isRequestDataNeeded()) ClassName(targetClassName.packageName, "$PREFIX_CLASS_REQUEST_DATA$methodName")
         else EmptyRequestData::class.asClassName()
     }
@@ -40,9 +40,13 @@ class TaskBinder internal constructor(
                 }
                 val methodRef = MemberName(targetClassName, method.name)
                 val isRunCatchNeeded = method.callbackParameter == null
-                if (isRunCatchNeeded) addStatement("runCatching<%T> {", method.returnType)
+                if (isRunCatchNeeded) beginControlFlow("runCatching<%T>", method.returnType)
                 addStatement("%T.%M(${targetArgs.joinToString(", ")})", targetClassName, methodRef)
-                if (isRunCatchNeeded) addStatement("}.onSuccess($PARAM_NAME_CALLBACK::success).onFailure($PARAM_NAME_CALLBACK::error)")
+                if (isRunCatchNeeded) {
+                    endControlFlow()
+                    addStatement(".onSuccess($PARAM_NAME_CALLBACK::success)")
+                    addStatement(".onFailure($PARAM_NAME_CALLBACK::error)")
+                }
             }
             .build()
 

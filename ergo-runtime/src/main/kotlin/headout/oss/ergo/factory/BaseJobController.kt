@@ -15,11 +15,11 @@ import kotlin.coroutines.CoroutineContext
 abstract class BaseJobController : CoroutineScope {
     override val coroutineContext: CoroutineContext = Dispatchers.Unconfined
 
-    lateinit var requestParser: JobRequestParser
+    lateinit var requestParserBase: BaseJobRequestParser
 
     private suspend fun createTaskController(taskId: TaskId, jobId: JobId, rawData: String): BaseTaskController<*, *> {
-        val requestData = requestParser.getRequestData(taskId, rawData)
-        return requestParser.callConstructor(taskId, jobId, requestData)
+        val requestData = requestParserBase.parseRequestData(taskId, rawData)
+        return requestParserBase.newTaskController(taskId, jobId, requestData)
     }
 
     suspend fun runJob(taskId: TaskId, jobId: JobId, rawData: String): JobResult<*> {

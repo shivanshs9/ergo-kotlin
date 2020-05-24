@@ -4,6 +4,11 @@ plugins {
 
 dependencies {
     implementation(kotlin("stdlib-jdk8"))
+    implementation(rootProject.ext["deps.serialization"] as String)
+    implementation(rootProject.ext["deps.coroutine"] as String)
+
+    implementation(project(":ergo-runtime"))
+    annotationProcessor(project(":ergo-processor"))
 }
 
 tasks {
