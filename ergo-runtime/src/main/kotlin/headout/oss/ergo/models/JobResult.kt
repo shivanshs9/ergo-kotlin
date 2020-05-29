@@ -1,5 +1,6 @@
 package headout.oss.ergo.models
 
+import headout.oss.ergo.annotations.TaskId
 import headout.oss.ergo.exceptions.BaseJobError
 import kotlinx.serialization.Serializable
 
@@ -8,12 +9,17 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class JobResult<out T>(
-    val jobId: JobId, val data: T? = null,
+    val taskId: TaskId, val jobId: JobId, val data: T? = null,
     val metadata: JobResultMetadata
 ) : JobParameter {
+    val isError by lazy { metadata.status != JobResultMetadata.STATUS.SUCCESS.code }
+
     companion object {
-        fun <T> success(jobId: JobId, data: T) = JobResult(jobId, data, JobResultMetadata.success())
-        fun error(jobId: JobId, error: BaseJobError) = JobResult<Any>(jobId, metadata = JobResultMetadata.error(error))
+        fun <T> success(taskId: TaskId, jobId: JobId, data: T) =
+            JobResult(taskId, jobId, data, JobResultMetadata.success())
+
+        fun error(taskId: TaskId, jobId: JobId, error: BaseJobError) =
+            JobResult<Any>(taskId, jobId, metadata = JobResultMetadata.error(error))
     }
 }
 

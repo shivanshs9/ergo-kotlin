@@ -5,7 +5,7 @@ import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import headout.oss.ergo.annotations.Task
 import headout.oss.ergo.exceptions.ExceptionUtils
-import headout.oss.ergo.factory.BaseJobRequestParser
+import headout.oss.ergo.factory.IJobRequestParser
 import headout.oss.ergo.factory.JsonFactory
 import headout.oss.ergo.models.EmptyRequestData
 import headout.oss.ergo.utils.getExecutableElement
@@ -74,7 +74,7 @@ class TaskProcessor : KotlinAbstractProcessor() {
     }
 
     private fun brewJobRequestKotlin(bindingMap: Map<TypeElement, BindingSet>) =
-        FileSpec.builder(BaseJobRequestParser::class.java.packageName, CLASS_NAME_JOB_REQUEST_PARSER)
+        FileSpec.builder(IJobRequestParser::class.java.packageName, CLASS_NAME_JOB_REQUEST_PARSER)
             .addImport("kotlinx.serialization", "serializer")
             .addType(createJobRequestParser(bindingMap))
             .addComment("Generated code by Ergo. DO NOT MODIFY!!")
@@ -83,13 +83,13 @@ class TaskProcessor : KotlinAbstractProcessor() {
     private fun createJobRequestParser(bindingMap: Map<TypeElement, BindingSet>) = TypeSpec.objectBuilder(
         CLASS_NAME_JOB_REQUEST_PARSER
     )
-        .superclass(BaseJobRequestParser::class)
+        .addSuperinterface(IJobRequestParser::class)
         .addFunction(createParseRequestDataFunction(bindingMap))
         .addFunction(createNewTaskControllerFunction(bindingMap))
         .build()
 
     private fun createParseRequestDataFunction(bindingMap: Map<TypeElement, BindingSet>) = FunSpec.tempOverriding(
-        BaseJobRequestParser::class.getExecutableElement(
+        IJobRequestParser::class.getExecutableElement(
             "parseRequestData",
             elementUtils
         )!!
@@ -116,7 +116,7 @@ class TaskProcessor : KotlinAbstractProcessor() {
         .build()
 
     private fun createNewTaskControllerFunction(bindingMap: Map<TypeElement, BindingSet>) = FunSpec.tempOverriding(
-        BaseJobRequestParser::class.getExecutableElement(
+        IJobRequestParser::class.getExecutableElement(
             "newTaskController",
             elementUtils
         )!!

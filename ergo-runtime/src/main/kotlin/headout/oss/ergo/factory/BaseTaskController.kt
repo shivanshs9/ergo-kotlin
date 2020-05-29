@@ -21,7 +21,7 @@ abstract class BaseTaskController<Req : JobRequestData, Res>(
     val requestData: Req
 ) : TaskController {
     // Called by client on success
-    open fun processSuccess(result: Res) = JobResult.success(jobId, result)
+    open fun processSuccess(result: Res) = JobResult.success(taskId, jobId, result)
 
     override suspend fun execute(): JobResult<Res> {
         val jobRequest = handleAndWrapError(ExceptionUtils::processLibraryError) { JobRequest(jobId, requestData) }

@@ -14,6 +14,7 @@ allprojects {
         set("deps.compile-testing", "com.github.tschuchortdev:kotlin-compile-testing:1.2.8")
         set("deps.serialization", "org.jetbrains.kotlinx:kotlinx-serialization-runtime:0.20.0")
         set("deps.coroutine", "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.3.7")
+        set("deps.coroutine-jdk8", "org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.3.7")
     }
 }
 

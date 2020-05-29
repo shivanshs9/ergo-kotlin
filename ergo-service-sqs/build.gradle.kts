@@ -12,6 +12,9 @@ dependencies {
     implementation(kotlin("stdlib-jdk8"))
     implementation(rootProject.ext["deps.serialization"] as String)
     implementation(rootProject.ext["deps.coroutine"] as String)
+    implementation(rootProject.ext["deps.coroutine-jdk8"] as String)
+    implementation(platform("software.amazon.awssdk:bom:2.13.26"))
+    implementation("software.amazon.awssdk:sqs")
 
     implementation(project(":ergo-runtime"))
     kapt(project(":ergo-processor"))
