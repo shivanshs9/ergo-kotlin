@@ -31,10 +31,6 @@ class SqsMsgService(
     private val resultQueueUrl: String = requestQueueUrl,
     private val defaultVisibilityTimeout: Long = DEFAULT_VISIBILITY_TIMEOUT
 ) : BaseMsgService<Message>() {
-    init {
-        jobController.parser = JobParser
-    }
-
     private val defaultPingMessageDelay: Long by lazy { getPingDelay(defaultVisibilityTimeout) }
     private val pendingJobs = mutableSetOf<JobId>()
 
@@ -146,6 +142,10 @@ class SqsMsgService(
     }
 
     companion object : TaskServiceConversion {
+        init {
+            jobController.parser = JobParser
+        }
+
         const val MAX_BUFFERED_MESSAGES = 10
         val DEFAULT_VISIBILITY_TIMEOUT = TimeUnit.MINUTES.toSeconds(20)
         val TIMEOUT_RESULT_COLLECTION: Long = TimeUnit.MINUTES.toMillis(10)

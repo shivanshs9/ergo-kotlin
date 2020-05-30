@@ -86,6 +86,48 @@ class KotlinTaskTest {
         assertResult(result)
     }
 
+    @Test
+    fun noArgWithNonSerializableResult() {
+        val source = """
+            package example.tasks
+            
+            import headout.oss.ergo.annotations.Task
+            
+            object ExampleTask {
+                @Task(taskId="noArgWithNonSerializableResult")
+                @JvmStatic
+                fun noArgWithNonSerializableResult(): Result = Result(10)
+            }
+            
+            data class Result(val number: Int)
+        """.trimIndent()
+
+        val result = compile(source)
+        assertResult(result)
+    }
+
+    @Test
+    fun noArgWithSerializableResult() {
+        val source = """
+            package example.tasks
+            
+            import kotlinx.serialization.Serializable
+            import headout.oss.ergo.annotations.Task
+            
+            object ExampleTask {
+                @Task(taskId="noArgWithSerializableResult")
+                @JvmStatic
+                fun noArgWithSerializableResult(): Result = Result(10)
+            }
+            
+            @Serializable
+            data class Result(val number: Int)
+        """.trimIndent()
+
+        val result = compile(source)
+        assertResult(result)
+    }
+
     private fun assertResult(result: KotlinCompilation.Result) {
         result.sourcesGeneratedByAnnotationProcessor.forEach {
             println(it.canonicalPath)

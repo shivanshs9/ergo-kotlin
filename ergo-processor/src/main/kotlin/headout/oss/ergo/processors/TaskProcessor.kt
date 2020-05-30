@@ -28,7 +28,7 @@ class TaskProcessor : KotlinAbstractProcessor() {
             }.onFailure { handleBrewError(it, binding.key) }
         }
         kotlin.runCatching {
-            val jobParserBinder = JobParserBinder(bindingMap, elementUtils)
+            val jobParserBinder = JobParserBinder(bindingMap, this)
             jobParserBinder.brewKotlin().writeTo(filer)
         }.onFailure { if (it !is FilerException) error(it) }
         return false

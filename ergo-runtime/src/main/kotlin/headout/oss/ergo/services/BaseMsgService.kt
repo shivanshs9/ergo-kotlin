@@ -16,8 +16,6 @@ import kotlin.coroutines.CoroutineContext
  * Created by shivanshs9 on 28/05/20.
  */
 abstract class BaseMsgService<T>(private val numWorkers: Int = DEFAULT_NUMBER_WORKERS) : CoroutineScope {
-    protected val jobController: BaseJobController = JobController
-
     private val supervisorJob = SupervisorJob()
     override val coroutineContext: CoroutineContext = Dispatchers.IO + supervisorJob
 
@@ -63,6 +61,8 @@ abstract class BaseMsgService<T>(private val numWorkers: Int = DEFAULT_NUMBER_WO
     protected fun parseResult(result: JobResult<*>) = jobController.parser.serializeJobResult(result)
 
     companion object {
+        val jobController: BaseJobController = JobController
+
         private const val DEFAULT_NUMBER_WORKERS = 8
 
         const val CAPACITY_CAPTURE_BUFFER = 40

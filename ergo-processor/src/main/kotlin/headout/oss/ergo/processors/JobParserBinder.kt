@@ -9,17 +9,19 @@ import headout.oss.ergo.models.EmptyRequestData
 import headout.oss.ergo.models.JobResult
 import headout.oss.ergo.utils.getExecutableElement
 import headout.oss.ergo.utils.tempOverriding
+import kotlinx.serialization.Serializable
+import me.eugeniomarletti.kotlin.processing.KotlinProcessingEnvironment
 import javax.lang.model.element.TypeElement
-import javax.lang.model.util.Elements
 
 /**
  * Created by shivanshs9 on 30/05/20.
  */
-class JobParserBinder(val bindingMap: Map<TypeElement, BindingSet>, val elementUtils: Elements) {
+class JobParserBinder(
+    val bindingMap: Map<TypeElement, BindingSet>,
+    processingEnvironment: KotlinProcessingEnvironment
+) : KotlinProcessingEnvironment by processingEnvironment {
     fun brewKotlin() =
         FileSpec.builder(IJobParser::class.java.packageName, CLASS_NAME_JOB_PARSER)
-            .addImport("kotlinx.serialization", "serializer")
-            .addImport("kotlinx.serialization.builtins", "serializer")
             .addType(createJobRequestParser())
             .addComment("Generated code by Ergo. DO NOT MODIFY!!")
             .build()
@@ -100,12 +102,29 @@ class JobParserBinder(val bindingMap: Map<TypeElement, BindingSet>, val elementU
         .apply {
             val jsonRef = MemberName(JsonFactory::class.asClassName(), "json")
             val jobResultClass = JobResult::class.asClassName()
+            val serializableClassName = Serializable::class.asClassName()
             bindingMap.values.forEach { controllerBind ->
                 controllerBind.tasks.forEach { taskBind ->
                     val resultClass = taskBind.method.resultType
+                    val resultSerializer = BUILTIN_SERIALIZERS[resultClass]
                     val paramJobResultClass = jobResultClass.parameterizedBy(resultClass)
                     beginControlFlow("%S ->", taskBind.task.taskId)
-                    addStatement("val serializer = %T.serializer(%T.serializer())", jobResultClass, resultClass)
+                    if (resultSerializer != null) addStatement(
+                        "val serializer = %T.serializer(%T.%M())",
+                        jobResultClass,
+                        resultClass,
+                        resultSerializer
+                    )
+                    else {
+//                        require(resultClass.annotations.find { it.className == serializableClassName } != null) {
+//                            "Return type $resultClass of ${taskBind.method.name} must be annotated with $serializableClassName"
+//                        }
+                        addStatement(
+                            "val serializer = %T.serializer(%M())",
+                            jobResultClass,
+                            MemberName(resultClass as ClassName, "serializer")
+                        )
+                    }
                     addStatement("%M.stringify(serializer, %N as %T)", jsonRef, "arg0", paramJobResultClass)
                     endControlFlow()
                 }
@@ -116,6 +135,29 @@ class JobParserBinder(val bindingMap: Map<TypeElement, BindingSet>, val elementU
         .build()
 
     companion object {
+        private val BUILTIN_SERIALIZERS = mapOf(
+            String::class to "serializer",
+            Char::class to "serializer",
+            CharArray::class to "CharArraySerializer",
+            Double::class to "serializer",
+            DoubleArray::class to "DoubleArraySerializer",
+            Float::class to "serializer",
+            FloatArray::class to "FloatArraySerializer",
+            Long::class to "serializer",
+            LongArray::class to "LongArraySerializer",
+            Int::class to "serializer",
+            IntArray::class to "IntArraySerializer",
+            Short::class to "serializer",
+            ShortArray::class to "ShortArraySerializer",
+            Byte::class to "serializer",
+            ByteArray::class to "ByteArraySerializer",
+            Boolean::class to "serializer",
+            BooleanArray::class to "BooleanArraySerializer",
+            Unit::class to "UnitSerializer"
+        )
+            .mapKeys { it.key.asClassName() }
+            .mapValues { MemberName("kotlinx.serialization.builtins", it.value) }
+
         private const val CLASS_NAME_JOB_PARSER = "JobParser"
     }
 }

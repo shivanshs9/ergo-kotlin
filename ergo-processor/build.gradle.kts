@@ -18,6 +18,7 @@ dependencies {
     implementation(rootProject.ext["deps.kotlinpoet-metadata"] as String)
     implementation(rootProject.ext["deps.kotlinpoet"] as String)
 
+//    testImplementation("org.jetbrains.kotlin:plugin.serialization")
     testImplementation(rootProject.ext["deps.kotlin-metadata"] as String)
     testImplementation(rootProject.ext["deps.truth"] as String)
     testImplementation(rootProject.ext["deps.junit"] as String)

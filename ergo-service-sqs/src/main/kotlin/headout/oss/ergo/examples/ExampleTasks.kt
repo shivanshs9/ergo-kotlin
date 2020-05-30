@@ -15,7 +15,20 @@ object ExampleTasks {
     @Task("abc.2")
     @JvmStatic
     fun happens(request: WhyDisKolaveriDi, callback: JobCallback<Int>) = callback.success(request.i * 10)
+
+//    @Task("noArgWithNonSerializableResult")
+//    @JvmStatic
+//    fun noArgWithNonSerializableResult(): NonSerializableResult = NonSerializableResult(10)
+
+    @Task("noArgWithSerializableResult")
+    @JvmStatic
+    fun noArgWithSerializableResult(): Result = Result(10)
 }
+
+data class NonSerializableResult(val number: Int)
+
+@Serializable
+data class Result(val number: Int)
 
 @Serializable
 data class WhyDisKolaveriDi(val i: Int)
