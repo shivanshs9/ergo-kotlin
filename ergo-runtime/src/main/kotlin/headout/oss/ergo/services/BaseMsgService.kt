@@ -60,6 +60,8 @@ abstract class BaseMsgService<T>(private val numWorkers: Int = DEFAULT_NUMBER_WO
 
     protected abstract suspend fun handleCaptures(): Job
 
+    protected fun parseResult(result: JobResult<*>) = jobController.parser.serializeJobResult(result)
+
     companion object {
         private const val DEFAULT_NUMBER_WORKERS = 8
 

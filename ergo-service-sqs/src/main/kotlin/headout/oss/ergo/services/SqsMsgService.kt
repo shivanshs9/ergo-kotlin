@@ -1,7 +1,7 @@
 package headout.oss.ergo.services
 
 import headout.oss.ergo.annotations.TaskId
-import headout.oss.ergo.factory.JobRequestParser
+import headout.oss.ergo.factory.JobParser
 import headout.oss.ergo.models.JobId
 import headout.oss.ergo.models.JobResult
 import headout.oss.ergo.models.RequestMsg
@@ -32,7 +32,7 @@ class SqsMsgService(
     private val defaultVisibilityTimeout: Long = DEFAULT_VISIBILITY_TIMEOUT
 ) : BaseMsgService<Message>() {
     init {
-        jobController.requestParser = JobRequestParser
+        jobController.parser = JobParser
     }
 
     private val defaultPingMessageDelay: Long by lazy { getPingDelay(defaultVisibilityTimeout) }
@@ -110,8 +110,7 @@ class SqsMsgService(
 
     private suspend fun pushResults(jobResults: List<JobResult<*>>) {
         val msgEntries = jobResults.map {
-            TODO("Implement serialization")
-            val msgBody = "TODO"
+            val msgBody = parseResult(it)
             SendMessageBatchRequestEntry.builder()
                 .messageBody(msgBody)
                 .messageGroupId(it.taskId)

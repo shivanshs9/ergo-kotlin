@@ -124,7 +124,7 @@ fun FunSpec.Companion.tempOverriding(method: ExecutableElement): FunSpec.Builder
         .map { it.asTypeVariableName() }
         .forEach { funBuilder.addTypeVariable(it) }
 
-    funBuilder.returns(method.returnType.asTypeName())
+    funBuilder.returns(method.returnType.asTypeName().javaToKotlinType())
     funBuilder.addParameters(method.parameters.map {
         ParameterSpec.builder(it.simpleName.toString(), it.javaToKotlinType()).build()
     })

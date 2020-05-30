@@ -1,5 +1,6 @@
 package headout.oss.ergo.processors
 
+import com.squareup.kotlinpoet.ParameterizedTypeName
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.plusParameter
 import com.squareup.kotlinpoet.TypeName
 import com.squareup.kotlinpoet.asTypeName
@@ -19,6 +20,10 @@ data class MethodSignature(
 
     val callbackType: TypeName by lazy {
         callbackParameter?.typeName ?: JobCallback::class.asTypeName().plusParameter(returnType)
+    }
+
+    val resultType: TypeName by lazy {
+        (callbackParameter?.typeName as? ParameterizedTypeName)?.typeArguments?.get(0) ?: returnType
     }
 
     val targetParameters by lazy {

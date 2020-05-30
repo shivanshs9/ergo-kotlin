@@ -11,11 +11,11 @@ import kotlinx.coroutines.withContext
  * Created by shivanshs9 on 24/05/20.
  */
 abstract class BaseJobController {
-    lateinit var requestParser: IJobRequestParser
+    lateinit var parser: IJobParser
 
     private suspend fun createTaskController(taskId: TaskId, jobId: JobId, rawData: String): BaseTaskController<*, *> {
-        val requestData = requestParser.parseRequestData(taskId, rawData)
-        return requestParser.newTaskController(taskId, jobId, requestData)
+        val requestData = parser.parseRequestData(taskId, rawData)
+        return parser.newTaskController(taskId, jobId, requestData)
     }
 
     suspend fun runJob(taskId: TaskId, jobId: JobId, rawData: String): JobResult<*> = withContext(Dispatchers.Main) {
