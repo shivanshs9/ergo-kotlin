@@ -1,18 +1,11 @@
+import dependencies.implementsCommon
+
 plugins {
-    kotlin("jvm") version "1.3.72"
+    kotlinJvm()
 }
 
 dependencies {
-    implementation(kotlin("stdlib-jdk8"))
-}
-
-tasks {
-    compileKotlin {
-        kotlinOptions.jvmTarget = "1.8"
-    }
-    compileTestKotlin {
-        kotlinOptions.jvmTarget = "1.8"
-    }
+    implementsCommon()
 }
 
 apply(from = rootProject.file("gradle/common.gradle.kts"))
