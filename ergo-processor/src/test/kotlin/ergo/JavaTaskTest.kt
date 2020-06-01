@@ -6,6 +6,7 @@ import com.tschuchort.compiletesting.KotlinCompilation.ExitCode
 import com.tschuchort.compiletesting.SourceFile
 import headout.oss.ergo.processors.TaskProcessor
 import org.intellij.lang.annotations.Language
+import org.jetbrains.kotlinx.serialization.compiler.extensions.SerializationComponentRegistrar
 import org.junit.Test
 
 /**
@@ -102,6 +103,7 @@ class JavaTaskTest {
         sources = listOf(SourceFile.java(EXAMPLE_JAVA_FILE, source))
         annotationProcessors = listOf(TaskProcessor())
         inheritClassPath = true
+        compilerPlugins = listOf(SerializationComponentRegistrar())
         messageOutputStream = System.out
     }.compile()
 

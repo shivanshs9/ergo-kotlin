@@ -6,6 +6,7 @@ import com.tschuchort.compiletesting.KotlinCompilation.ExitCode
 import com.tschuchort.compiletesting.SourceFile
 import headout.oss.ergo.processors.TaskProcessor
 import org.intellij.lang.annotations.Language
+import org.jetbrains.kotlinx.serialization.compiler.extensions.SerializationComponentRegistrar
 import org.junit.Test
 
 /**
@@ -103,7 +104,7 @@ class KotlinTaskTest {
         """.trimIndent()
 
         val result = compile(source)
-        assertResult(result)
+        assertResult(result, exitCode = ExitCode.COMPILATION_ERROR)
     }
 
     @Test
@@ -128,18 +129,19 @@ class KotlinTaskTest {
         assertResult(result)
     }
 
-    private fun assertResult(result: KotlinCompilation.Result) {
+    private fun assertResult(result: KotlinCompilation.Result, exitCode: ExitCode = ExitCode.OK) {
         result.sourcesGeneratedByAnnotationProcessor.forEach {
             println(it.canonicalPath)
             println(it.readText())
         }
-        assertThat(result.exitCode).isEqualTo(ExitCode.OK)
+        assertThat(result.exitCode).isEqualTo(exitCode)
     }
 
     private fun compile(@Language("kotlin") source: String) = KotlinCompilation().apply {
         sources = listOf(SourceFile.kotlin(EXAMPLE_KOTLIN_FILE, source))
         annotationProcessors = listOf(TaskProcessor())
         inheritClassPath = true
+        compilerPlugins = listOf(SerializationComponentRegistrar())
         messageOutputStream = System.out
     }.compile()
 

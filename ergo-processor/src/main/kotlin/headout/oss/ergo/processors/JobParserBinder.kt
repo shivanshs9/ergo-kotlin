@@ -120,9 +120,9 @@ class JobParserBinder(
 //                            "Return type $resultClass of ${taskBind.method.name} must be annotated with $serializableClassName"
 //                        }
                         addStatement(
-                            "val serializer = %T.serializer(%M())",
+                            "val serializer = %T.serializer(%T.serializer())",
                             jobResultClass,
-                            MemberName(resultClass as ClassName, "serializer")
+                            resultClass
                         )
                     }
                     addStatement("%M.stringify(serializer, %N as %T)", jsonRef, "arg0", paramJobResultClass)

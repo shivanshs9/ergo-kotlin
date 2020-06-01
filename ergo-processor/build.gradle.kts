@@ -14,6 +14,9 @@ dependencies {
 
     testImplementsCommon()
     testImplementsCodeGen()
+
+    // Provides serialization compiler plugin for compiler-testing
+    testImplementation("org.jetbrains.kotlin:kotlin-serialization:$kotlinVersion")
 }
 
 apply(from = rootProject.file("gradle/common.gradle.kts"))
