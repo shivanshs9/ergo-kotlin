@@ -1,7 +1,6 @@
 package headout.oss.ergo.services
 
 import headout.oss.ergo.annotations.TaskId
-import headout.oss.ergo.factory.JobParser
 import headout.oss.ergo.models.JobId
 import headout.oss.ergo.models.JobResult
 import headout.oss.ergo.models.RequestMsg
@@ -142,10 +141,6 @@ class SqsMsgService(
     }
 
     companion object : TaskServiceConversion {
-        init {
-            jobController.parser = JobParser
-        }
-
         const val MAX_BUFFERED_MESSAGES = 10
         val DEFAULT_VISIBILITY_TIMEOUT = TimeUnit.MINUTES.toSeconds(20)
         val TIMEOUT_RESULT_COLLECTION: Long = TimeUnit.MINUTES.toMillis(10)

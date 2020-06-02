@@ -21,13 +21,13 @@ class JobParserBinder(
     processingEnvironment: KotlinProcessingEnvironment
 ) : KotlinProcessingEnvironment by processingEnvironment {
     fun brewKotlin() =
-        FileSpec.builder(IJobParser::class.java.packageName, CLASS_NAME_JOB_PARSER)
+        FileSpec.builder(IJobParser::class.java.packageName, IJobParser.CLASS_NAME_JOB_PARSER)
             .addType(createJobRequestParser())
             .addComment("Generated code by Ergo. DO NOT MODIFY!!")
             .build()
 
     private fun createJobRequestParser() = TypeSpec.objectBuilder(
-        CLASS_NAME_JOB_PARSER
+        IJobParser.CLASS_NAME_JOB_PARSER
     )
         .addSuperinterface(IJobParser::class)
         .addFunction(createParseRequestDataFunction())
@@ -157,7 +157,5 @@ class JobParserBinder(
         )
             .mapKeys { it.key.asClassName() }
             .mapValues { MemberName("kotlinx.serialization.builtins", it.value) }
-
-        private const val CLASS_NAME_JOB_PARSER = "JobParser"
     }
 }

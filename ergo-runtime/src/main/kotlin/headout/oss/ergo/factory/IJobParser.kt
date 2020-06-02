@@ -18,4 +18,9 @@ interface IJobParser {
         jobId: JobId,
         requestData: JobRequestData
     ): BaseTaskController<*, *>
+
+    companion object {
+        const val CLASS_NAME_JOB_PARSER = "JobParser"
+        val QUALIFIED_NAME_INHERIT_OBJECT = "${IJobParser::class.java.packageName}.$CLASS_NAME_JOB_PARSER"
+    }
 }

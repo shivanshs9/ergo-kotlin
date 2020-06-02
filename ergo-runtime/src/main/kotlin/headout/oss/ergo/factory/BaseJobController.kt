@@ -11,7 +11,9 @@ import kotlinx.coroutines.withContext
  * Created by shivanshs9 on 24/05/20.
  */
 abstract class BaseJobController {
-    lateinit var parser: IJobParser
+    val parser: IJobParser by lazy {
+        Class.forName(IJobParser.QUALIFIED_NAME_INHERIT_OBJECT).kotlin.objectInstance as IJobParser
+    }
 
     private suspend fun createTaskController(taskId: TaskId, jobId: JobId, rawData: String): BaseTaskController<*, *> {
         val requestData = parser.parseRequestData(taskId, rawData)
