@@ -15,10 +15,10 @@ import kotlin.coroutines.CoroutineContext
 /**
  * Created by shivanshs9 on 28/05/20.
  */
-abstract class BaseMsgService<T>(private val numWorkers: Int = DEFAULT_NUMBER_WORKERS) : CoroutineScope {
-    private val supervisorJob = SupervisorJob()
-    override val coroutineContext: CoroutineContext = Dispatchers.IO + supervisorJob
-
+abstract class BaseMsgService<T>(
+    scope: CoroutineScope,
+    private val numWorkers: Int = DEFAULT_NUMBER_WORKERS
+) : CoroutineScope by scope {
     protected open val captures = Channel<MessageCapture<T>>(CAPACITY_CAPTURE_BUFFER)
 
     fun start() = launch {
@@ -30,6 +30,7 @@ abstract class BaseMsgService<T>(private val numWorkers: Int = DEFAULT_NUMBER_WO
                 }.onFailure { exc ->
                     println("Worker '$workerId' on '${currentThread().name}' caught exception trying to process message '${request.jobId}'")
                     exc.printStackTrace()
+                    handleException(exc)
                 }.getOrElse {
                     JobResult.error(
                         request.taskId,
@@ -50,9 +51,9 @@ abstract class BaseMsgService<T>(private val numWorkers: Int = DEFAULT_NUMBER_WO
         handleCaptures()
     }
 
-    fun stop() = supervisorJob.cancel()
+    fun stop() = cancel()
 
-    protected abstract suspend fun processRequest(request: RequestMsg<T>): JobResult<*>
+    abstract suspend fun processRequest(request: RequestMsg<T>): JobResult<*>
 
     protected abstract suspend fun collectRequests(): ReceiveChannel<RequestMsg<T>>
 
@@ -63,10 +64,12 @@ abstract class BaseMsgService<T>(private val numWorkers: Int = DEFAULT_NUMBER_WO
     companion object {
         val jobController: BaseJobController = JobController
 
-        private const val DEFAULT_NUMBER_WORKERS = 8
-
+        const val DEFAULT_NUMBER_WORKERS = 8
         const val CAPACITY_CAPTURE_BUFFER = 40
         const val CAPACITY_REQUEST_BUFFER = 20
+
+        // Dummy method, mostly to verify exceptions in unit tests
+        fun handleException(exc: Throwable) {}
     }
 }
 

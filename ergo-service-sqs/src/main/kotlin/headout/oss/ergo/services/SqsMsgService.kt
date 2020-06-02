@@ -7,13 +7,10 @@ import headout.oss.ergo.models.RequestMsg
 import headout.oss.ergo.utils.repeatUntilCancelled
 import headout.oss.ergo.utils.sendDelayed
 import headout.oss.ergo.utils.ticker
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.produce
 import kotlinx.coroutines.future.await
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.selects.select
 import software.amazon.awssdk.services.sqs.SqsAsyncClient
 import software.amazon.awssdk.services.sqs.model.*
@@ -28,8 +25,9 @@ class SqsMsgService(
     private val sqs: SqsAsyncClient,
     private val requestQueueUrl: String,
     private val resultQueueUrl: String = requestQueueUrl,
-    private val defaultVisibilityTimeout: Long = DEFAULT_VISIBILITY_TIMEOUT
-) : BaseMsgService<Message>() {
+    private val defaultVisibilityTimeout: Long = DEFAULT_VISIBILITY_TIMEOUT,
+    scope: CoroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+) : BaseMsgService<Message>(scope) {
     private val defaultPingMessageDelay: Long by lazy { getPingDelay(defaultVisibilityTimeout) }
     private val pendingJobs = mutableSetOf<JobId>()
 
@@ -52,8 +50,9 @@ class SqsMsgService(
 
     override suspend fun collectRequests(): ReceiveChannel<RequestMsg<Message>> =
         produce(Dispatchers.IO, CAPACITY_REQUEST_BUFFER) {
-            repeatUntilCancelled {
+            repeatUntilCancelled(BaseMsgService.Companion::handleException) {
                 val messages = sqs.receiveMessage(receiveRequest).await().messages()
+                println(messages)
                 for (msg in messages) {
                     val groupId = msg.attributes()[MessageSystemAttributeName.MESSAGE_GROUP_ID]
                         ?: error("Message doesn't have 'MessageGroupId' key!")
@@ -67,7 +66,7 @@ class SqsMsgService(
 
     override suspend fun handleCaptures(): Job = launch(Dispatchers.IO) {
         val bufferedResults = mutableListOf<JobResult<*>>()
-        repeatUntilCancelled {
+        repeatUntilCancelled(BaseMsgService.Companion::handleException) {
             select {
                 captures.onReceive {
                     when (it) {

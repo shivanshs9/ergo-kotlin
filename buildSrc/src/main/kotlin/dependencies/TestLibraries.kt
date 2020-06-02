@@ -8,12 +8,18 @@ import org.gradle.api.artifacts.dsl.DependencyHandler
 const val kotlinVersion = "1.3.72"
 
 object TestLibraries {
-    private object Versions
+    private object Versions {
+        const val mockK = "1.10.0"
+        const val coroutinesTest = "1.3.7"
+        const val jUnit = "4.13"
+    }
 
     const val compileTesting = "com.github.tschuchortdev:kotlin-compile-testing:1.2.8"
     const val compilerEmbeddable = "org.jetbrains.kotlin:kotlin-compiler-embeddable:$kotlinVersion"
     const val truth = "com.google.truth:truth:1.0.1"
-    const val jUnit = "junit:junit:4.13"
+    const val jUnit = "junit:junit:${Versions.jUnit}"
+    const val mockK = "io.mockk:mockk:${Versions.mockK}"
+    const val kotlinxCoroutines = "org.jetbrains.kotlinx:kotlinx-coroutines-test:${Versions.coroutinesTest}"
 }
 
 fun DependencyHandler.testImplementsCodeGen() {
@@ -23,6 +29,14 @@ fun DependencyHandler.testImplementsCodeGen() {
 }
 
 fun DependencyHandler.testImplementsCommon() {
-    add("testImplementation", TestLibraries.jUnit)
+    add("testApi", TestLibraries.jUnit)
     add("testImplementation", TestLibraries.truth)
+}
+
+fun DependencyHandler.testImplementsMock() {
+    add("testImplementation", TestLibraries.mockK)
+}
+
+fun DependencyHandler.testImplementsCoroutines() {
+    add("testImplementation", TestLibraries.kotlinxCoroutines)
 }

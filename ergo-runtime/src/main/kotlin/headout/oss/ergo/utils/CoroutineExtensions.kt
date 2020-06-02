@@ -11,7 +11,7 @@ import kotlin.coroutines.EmptyCoroutineContext
 /**
  * Created by shivanshs9 on 28/05/20.
  */
-suspend fun CoroutineScope.repeatUntilCancelled(block: suspend () -> Unit) {
+suspend fun CoroutineScope.repeatUntilCancelled(exceptionHandler: (Throwable) -> Unit = {}, block: suspend () -> Unit) {
     while (isActive) {
         try {
             block()
@@ -21,6 +21,7 @@ suspend fun CoroutineScope.repeatUntilCancelled(block: suspend () -> Unit) {
         } catch (ex: Exception) {
             println("${currentThread().name} failed with {$ex}. Retrying...")
             ex.printStackTrace()
+            exceptionHandler(ex)
         }
     }
     println("coroutine on ${currentThread().name} exiting")

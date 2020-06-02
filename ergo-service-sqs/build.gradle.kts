@@ -18,6 +18,10 @@ dependencies {
     implementsAwsSqs()
     implementation(project(":ergo-runtime"))
     kapt(project(":ergo-processor"))
+
+    testImplementsCommon()
+    testImplementsCoroutines()
+    testImplementsMock()
 }
 
 apply(from = rootProject.file("gradle/common.gradle.kts"))
