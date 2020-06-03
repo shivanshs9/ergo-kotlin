@@ -16,6 +16,11 @@ class InvalidRequestError(
     msg: String = "Request data is invalid!"
 ) : BaseClientError(STATUS.ERROR_INVALID_REQUEST, error, msg)
 
+class TaskNotFoundError(
+    error: Throwable? = null,
+    msg: String = "Given taskId not found"
+) : BaseLibraryError(STATUS.ERROR_NOT_FOUND, error, msg)
+
 class ClientInternalError(
     error: Throwable,
     msg: String = "Faced unknown error in client logic"

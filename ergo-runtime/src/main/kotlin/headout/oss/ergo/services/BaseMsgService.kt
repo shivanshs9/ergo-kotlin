@@ -1,16 +1,20 @@
 package headout.oss.ergo.services
 
+import headout.oss.ergo.exceptions.BaseJobError
+import headout.oss.ergo.exceptions.InvalidRequestError
 import headout.oss.ergo.exceptions.LibraryInternalError
 import headout.oss.ergo.factory.BaseJobController
 import headout.oss.ergo.factory.JobController
 import headout.oss.ergo.models.JobResult
 import headout.oss.ergo.models.RequestMsg
 import headout.oss.ergo.utils.immortalWorkers
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.launch
 import java.lang.Thread.currentThread
-import kotlin.coroutines.CoroutineContext
 
 /**
  * Created by shivanshs9 on 28/05/20.
@@ -19,7 +23,8 @@ abstract class BaseMsgService<T>(
     scope: CoroutineScope,
     private val numWorkers: Int = DEFAULT_NUMBER_WORKERS
 ) : CoroutineScope by scope {
-    protected open val captures = Channel<MessageCapture<T>>(CAPACITY_CAPTURE_BUFFER)
+    protected val captures = Channel<MessageCapture<T>>(CAPACITY_CAPTURE_BUFFER)
+//    val resultCaptureChannel: ReceiveChannel<MessageCapture<T>> = captures
 
     fun start() = launch {
         val requests = collectRequests()
@@ -30,15 +35,23 @@ abstract class BaseMsgService<T>(
                 }.onFailure { exc ->
                     println("Worker '$workerId' on '${currentThread().name}' caught exception trying to process message '${request.jobId}'")
                     exc.printStackTrace()
-                    handleException(exc)
+                    collectCaughtExceptions(exc)
                 }.getOrElse {
+                    val error = when {
+                        it is BaseJobError -> it
+                        it.message == "request.message.body() must not be null" -> InvalidRequestError(
+                            it,
+                            "message.body() must not be null"
+                        )
+                        else -> LibraryInternalError(
+                            it,
+                            "Worker '$workerId' on '${currentThread().name}' failed processing message '${request.jobId}'\n${it.localizedMessage}"
+                        )
+                    }
                     JobResult.error(
                         request.taskId,
                         request.jobId,
-                        LibraryInternalError(
-                            it,
-                            "Worker '$workerId' on '${currentThread().name}' failed processing message '${request.jobId}'"
-                        )
+                        error
                     )
                 }
                 captures.send(
@@ -69,7 +82,7 @@ abstract class BaseMsgService<T>(
         const val CAPACITY_REQUEST_BUFFER = 20
 
         // Dummy method, mostly to verify exceptions in unit tests
-        fun handleException(exc: Throwable) {}
+        fun collectCaughtExceptions(exc: Throwable) {}
     }
 }
 

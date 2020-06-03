@@ -13,13 +13,8 @@ abstract class BaseLibraryError(
 
 class ParseRequestError(
     error: Throwable? = null,
-    msg: String = "Malformed request data, error in deserialization"
+    msg: String = "Malformed request data, error in deserialization.\n${error?.localizedMessage}"
 ) : BaseLibraryError(STATUS.ERROR_PARSE, error, msg)
-
-class TaskNotFoundError(
-    error: Throwable? = null,
-    msg: String = "Given taskId not found"
-) : BaseLibraryError(STATUS.ERROR_NOT_FOUND, error, msg)
 
 class LibraryInternalError(
     error: Throwable,

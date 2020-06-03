@@ -50,7 +50,7 @@ class SqsMsgService(
 
     override suspend fun collectRequests(): ReceiveChannel<RequestMsg<Message>> =
         produce(Dispatchers.IO, CAPACITY_REQUEST_BUFFER) {
-            repeatUntilCancelled(BaseMsgService.Companion::handleException) {
+            repeatUntilCancelled(BaseMsgService.Companion::collectCaughtExceptions) {
                 val messages = sqs.receiveMessage(receiveRequest).await().messages()
                 println(messages)
                 for (msg in messages) {
@@ -66,7 +66,7 @@ class SqsMsgService(
 
     override suspend fun handleCaptures(): Job = launch(Dispatchers.IO) {
         val bufferedResults = mutableListOf<JobResult<*>>()
-        repeatUntilCancelled(BaseMsgService.Companion::handleException) {
+        repeatUntilCancelled(BaseMsgService.Companion::collectCaughtExceptions) {
             select {
                 captures.onReceive {
                     when (it) {

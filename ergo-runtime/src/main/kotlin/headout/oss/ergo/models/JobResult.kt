@@ -25,7 +25,7 @@ data class JobResult<out T>(
 
 @Serializable
 data class JobResultMetadata internal constructor(
-    val status: Int, val errorMsg: String? = null
+    val status: Int, val error: ErrorMetadata?
 ) {
     enum class STATUS(val code: Int) {
         SUCCESS(200),
@@ -36,7 +36,13 @@ data class JobResultMetadata internal constructor(
     }
 
     companion object {
-        fun success() = JobResultMetadata(STATUS.SUCCESS.code)
-        fun <T : BaseJobError> error(error: T) = JobResultMetadata(error.status.code, error.message)
+        fun success() = JobResultMetadata(STATUS.SUCCESS.code, null)
+        fun <T : BaseJobError> error(error: T) = JobResultMetadata(
+            error.status.code,
+            ErrorMetadata(error.message ?: error.localizedMessage, error.stackTrace.joinToString("\n"))
+        )
     }
 }
+
+@Serializable
+data class ErrorMetadata(val message: String, val traceback: String?)
