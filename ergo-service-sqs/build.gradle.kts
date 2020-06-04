@@ -17,8 +17,8 @@ dependencies {
     implementation(Libraries.coroutineJdk8)
     implementsAwsSqs()
     implementation(project(":ergo-runtime"))
-    kapt(project(":ergo-processor"))
 
+    kaptTest(project(":ergo-processor"))
     testImplementsCommon()
     testImplementsCoroutines()
     testImplementsMock()

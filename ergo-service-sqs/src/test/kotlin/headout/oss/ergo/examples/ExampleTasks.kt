@@ -22,7 +22,8 @@ object ExampleTasks {
 
     @Task("noArgWithSerializableResult")
     @JvmStatic
-    fun noArgWithSerializableResult(): Result = Result(10)
+    fun noArgWithSerializableResult(): Result =
+        Result(10)
 }
 
 data class NonSerializableResult(val number: Int)
