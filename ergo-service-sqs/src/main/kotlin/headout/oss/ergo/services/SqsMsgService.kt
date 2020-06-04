@@ -42,10 +42,10 @@ class SqsMsgService(
             .build()
     }
 
-    override suspend fun processRequest(request: RequestMsg<Message>): JobResult<*> {
-        val result = jobController.runJob(request.taskId, request.jobId, request.message.body())
-        pendingJobs.remove(result.jobId)
-        return result
+    override suspend fun processRequest(request: RequestMsg<Message>): JobResult<*> = try {
+        jobController.runJob(request.taskId, request.jobId, request.message.body())
+    } finally {
+        pendingJobs.remove(request.jobId)
     }
 
     override suspend fun collectRequests(): ReceiveChannel<RequestMsg<Message>> =
@@ -68,29 +68,30 @@ class SqsMsgService(
         val bufferedResults = mutableListOf<JobResult<*>>()
         repeatUntilCancelled(BaseMsgService.Companion::collectCaughtExceptions) {
             select {
-                captures.onReceive {
-                    when (it) {
-                        is ErrorResultCapture -> handleError(it)
-                        is SuccessResultCapture -> handleSuccess(it)
+                captures.onReceive { capture ->
+                    println("received $capture")
+                    when (capture) {
+                        is ErrorResultCapture -> handleError(capture)
+                        is SuccessResultCapture -> handleSuccess(capture)
                         is RespondResultCapture -> {
-                            bufferedResults.add(it.result)
+                            bufferedResults.add(capture.result)
                             if (bufferedResults.size == MAX_BUFFERED_MESSAGES) {
-                                pushResults(bufferedResults)
+                                pushResults(bufferedResults.toList())
                                 bufferedResults.clear()
                             }
                         }
-                        is PingMessageCapture -> if (pendingJobs.contains(it.request.jobId)) {
-                            val newTimeout = defaultVisibilityTimeout * (it.attempt + 1)
-                            changeVisibilityTimeout(it.request, newTimeout.toInt())
+                        is PingMessageCapture -> if (pendingJobs.contains(capture.request.jobId)) {
+                            val newTimeout = defaultVisibilityTimeout * (capture.attempt + 1)
+                            changeVisibilityTimeout(capture.request, newTimeout.toInt())
                             captures.sendDelayed(
-                                PingMessageCapture(it.request, it.attempt + 1),
+                                PingMessageCapture(capture.request, capture.attempt + 1),
                                 defaultPingMessageDelay
                             )
                         }
                     }
                 }
                 timeoutResultCollect.onReceive {
-                    pushResults(bufferedResults)
+                    pushResults(bufferedResults.toList())
                     bufferedResults.clear()
                 }
             }
@@ -102,7 +103,7 @@ class SqsMsgService(
     private suspend fun handleSuccess(resultCapture: SuccessResultCapture<Message>) =
         deleteMessage(resultCapture.request)
 
-    private suspend fun pushResults(jobResults: List<JobResult<*>>) {
+    private suspend fun pushResults(jobResults: List<JobResult<*>>) = launch(currentCoroutineContext()) {
         val msgEntries = jobResults.map {
             val msgBody = parseResult(it)
             SendMessageBatchRequestEntry.builder()
@@ -124,15 +125,16 @@ class SqsMsgService(
         }
     }
 
-    private suspend fun changeVisibilityTimeout(request: RequestMsg<Message>, visibilityTimeout: Int) {
-        sqs.changeMessageVisibility {
-            it.queueUrl(requestQueueUrl)
-            it.receiptHandle(request.message.receiptHandle())
-            it.visibilityTimeout(visibilityTimeout)
-        }.await()
-    }
+    private suspend fun changeVisibilityTimeout(request: RequestMsg<Message>, visibilityTimeout: Int) =
+        launch(currentCoroutineContext()) {
+            sqs.changeMessageVisibility {
+                it.queueUrl(requestQueueUrl)
+                it.receiptHandle(request.message.receiptHandle())
+                it.visibilityTimeout(visibilityTimeout)
+            }.await()
+        }
 
-    private suspend fun deleteMessage(request: RequestMsg<Message>) {
+    private suspend fun deleteMessage(request: RequestMsg<Message>) = launch(currentCoroutineContext()) {
         sqs.deleteMessage {
             it.queueUrl(requestQueueUrl)
             it.receiptHandle(request.message.receiptHandle())
@@ -142,7 +144,7 @@ class SqsMsgService(
     companion object : TaskServiceConversion {
         const val MAX_BUFFERED_MESSAGES = 10
         val DEFAULT_VISIBILITY_TIMEOUT = TimeUnit.MINUTES.toSeconds(20)
-        val TIMEOUT_RESULT_COLLECTION: Long = TimeUnit.MINUTES.toMillis(10)
+        val TIMEOUT_RESULT_COLLECTION: Long = TimeUnit.MINUTES.toMillis(2)
 
         override fun toTaskId(value: String): TaskId = value
 

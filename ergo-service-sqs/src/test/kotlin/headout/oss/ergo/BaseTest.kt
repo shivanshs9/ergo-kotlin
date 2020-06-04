@@ -5,6 +5,8 @@ import io.mockk.clearAllMocks
 import io.mockk.unmockkAll
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.plus
 import kotlinx.coroutines.test.TestCoroutineDispatcher
 import kotlinx.coroutines.test.TestCoroutineScope
 import kotlinx.coroutines.test.resetMain
@@ -19,7 +21,7 @@ import org.junit.BeforeClass
  */
 @ExperimentalCoroutinesApi
 open class BaseTest {
-    protected val testScope = TestCoroutineScope()
+    protected val testScope = TestCoroutineScope() + SupervisorJob()
 
     init {
         MockKAnnotations.init(this)

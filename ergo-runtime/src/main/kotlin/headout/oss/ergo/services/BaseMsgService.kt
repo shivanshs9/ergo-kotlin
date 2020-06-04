@@ -24,7 +24,6 @@ abstract class BaseMsgService<T>(
     private val numWorkers: Int = DEFAULT_NUMBER_WORKERS
 ) : CoroutineScope by scope {
     protected val captures = Channel<MessageCapture<T>>(CAPACITY_CAPTURE_BUFFER)
-//    val resultCaptureChannel: ReceiveChannel<MessageCapture<T>> = captures
 
     fun start() = launch {
         val requests = collectRequests()

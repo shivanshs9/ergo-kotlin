@@ -6,12 +6,12 @@ import headout.oss.ergo.models.JobResult
 import headout.oss.ergo.models.JobResultMetadata
 import io.mockk.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import org.junit.Test
 import software.amazon.awssdk.services.sqs.SqsAsyncClient
 import software.amazon.awssdk.services.sqs.model.*
 import java.util.concurrent.CompletableFuture
-import java.util.concurrent.TimeUnit
 import java.util.function.Consumer
 
 /**
@@ -29,12 +29,23 @@ class SqsMsgServiceTest : BaseTest() {
         mockCommonSqsClient()
     }
 
+    override fun afterTest() {
+        super.afterTest()
+        msgService.stop()
+    }
+
     @Test
     fun sufficientWorkersLaunchedOnStart() {
         msgService.start().apply {
             val workersCount = BaseMsgService.DEFAULT_NUMBER_WORKERS
             assertThat(children.count()).isEqualTo(workersCount)
         }
+        val countLauncher = 1
+        val countChannels = 2
+        val countWorkerSupervisor = 1
+        assertThat(
+            msgService.coroutineContext[Job]?.children?.count() ?: 0
+        ).isEqualTo(countChannels + countLauncher + countWorkerSupervisor)
     }
 
     @Test
@@ -131,22 +142,90 @@ class SqsMsgServiceTest : BaseTest() {
     }
 
     @Test
-    fun whenWorkerEncounteredError_RespondResultToResultQueue() {
-        mockkObject(SqsMsgService.Companion)
-        every { SqsMsgService.TIMEOUT_RESULT_COLLECTION } returns TimeUnit.SECONDS.toMillis(1)
-
+    fun whenWorkerEncounteredErrorAndBufferResultsToMax_PushToResultQueue() {
+        val msgCount = SqsMsgService.MAX_BUFFERED_MESSAGES
         val taskId = "taskNotFound"
         val receiptHandle = "receipt"
-        mockReceiveMessageResponse(taskId = taskId, body = "false", receiptHandle = receiptHandle)
+        mockReceiveMessageResponse(taskId = taskId, body = "false", receiptHandle = receiptHandle, msgCount = msgCount)
         msgService.start()
-        coVerifyAll {
+        coVerify {
             msgService.processRequest(any())
-            delay(DELAY_WAIT * 2)
-            msgService["pushResults"](any<List<JobResult<*>>>())
+            delay(DELAY_WAIT * msgCount)
+            msgService["pushResults"](match<List<JobResult<*>>> {
+                it.size == msgCount
+            })
         }
-//        verify {
-//
-//        }
+    }
+
+    @Test
+    fun whenWorkerEncounteredErrorAndBufferResultsInsufficientAndTimeoutHappened_PushToResultQueue() {
+        val msgCount = SqsMsgService.MAX_BUFFERED_MESSAGES - 1
+        val taskId = "taskNotFound"
+        val receiptHandle = "receipt"
+        mockReceiveMessageResponse(taskId = taskId, body = "false", receiptHandle = receiptHandle, msgCount = msgCount)
+        msgService.start()
+        coVerify {
+            msgService.processRequest(any())
+            delay(SqsMsgService.TIMEOUT_RESULT_COLLECTION) // time consuming since timeout value is 2 minutes
+            msgService["pushResults"](match<List<JobResult<*>>> {
+                it.size == msgCount
+            })
+        }
+    }
+
+    @Test
+    fun whenTaskRequestValidAndRanSuccessfullyAndBufferResultsToMax_PushToResultQueue() {
+        val msgCount = SqsMsgService.MAX_BUFFERED_MESSAGES
+        val taskId = "xyz.1"
+        val body = "{\"i\": 1, \"hi\": \"whatever\"}"
+        mockReceiveMessageResponse(taskId = taskId, body = body, msgCount = msgCount)
+        msgService.start()
+        coVerify {
+            msgService.processRequest(any())
+            delay(DELAY_WAIT * msgCount)
+            msgService["pushResults"](match<List<JobResult<*>>> {
+                it.size == msgCount
+            })
+        }
+    }
+
+    @Test
+    fun whenTaskRequestValidAndRanSuccessfullyAndBufferResultsInsufficientAndTimeoutHappened_PushToResultQueue() {
+        val msgCount = SqsMsgService.MAX_BUFFERED_MESSAGES - 1
+        val taskId = "xyz.1"
+        val body = "{\"i\": 1, \"hi\": \"whatever\"}"
+        mockReceiveMessageResponse(taskId = taskId, body = body, msgCount = msgCount)
+        msgService.start()
+        coVerify {
+            msgService.processRequest(any())
+            delay(SqsMsgService.TIMEOUT_RESULT_COLLECTION) // time consuming since timeout value is 2 minutes
+            msgService["pushResults"](match<List<JobResult<*>>> {
+                it.size == msgCount
+            })
+        }
+    }
+
+    @Test
+    fun whenPushResultsCalled_BatchSendMessageToSqsQueue() {
+        val msgCount = SqsMsgService.MAX_BUFFERED_MESSAGES
+        val taskId = "noArgWithSerializableResult"
+        val body = ""
+        mockReceiveMessageResponse(taskId = taskId, body = body, msgCount = msgCount)
+        msgService.start()
+        coVerify {
+            msgService.processRequest(any())
+            delay(DELAY_WAIT * msgCount)
+            msgService["pushResults"](match<List<JobResult<*>>> {
+                it.size == msgCount
+            })
+        }
+        verify {
+            sqsClient.sendMessageBatch(match<SendMessageBatchRequest> {
+                val entries = it.entries()
+                println(entries)
+                it.queueUrl() == QUEUE_URL && entries.size == msgCount
+            })
+        }
     }
 
     private fun mockCommonSqsClient() {
@@ -160,26 +239,33 @@ class SqsMsgServiceTest : BaseTest() {
         jobId: String = "jobId",
         taskId: String? = null,
         body: String? = null,
-        receiptHandle: String = "receipt"
+        receiptHandle: String = "receipt",
+        msgCount: Int = 1
     ) {
         val response = ReceiveMessageResponse.builder()
             .messages(
-                Message.builder()
-                    .messageId(jobId)
-                    .apply {
-                        taskId?.let {
-                            attributes(mapOf(MessageSystemAttributeName.MESSAGE_GROUP_ID to it))
+                List(msgCount) {
+                    Message.builder()
+                        .messageId(jobId)
+                        .apply {
+                            taskId?.let {
+                                attributes(mapOf(MessageSystemAttributeName.MESSAGE_GROUP_ID to it))
+                            }
                         }
-                    }
-                    .apply {
-                        body?.let { body(body) }
-                    }
-                    .receiptHandle(receiptHandle)
-                    .build()
+                        .apply {
+                            body?.let { body(body) }
+                        }
+                        .receiptHandle(receiptHandle)
+                        .build()
+                }
             )
             .build()
-        every { sqsClient.receiveMessage(any<ReceiveMessageRequest>()) } returns CompletableFuture.completedFuture(
-            response
+        every { sqsClient.receiveMessage(any<ReceiveMessageRequest>()) } returnsMany listOf<CompletableFuture<ReceiveMessageResponse>>(
+            CompletableFuture.completedFuture(response),
+            CompletableFuture.supplyAsync {
+                Thread.sleep(SqsMsgService.TIMEOUT_RESULT_COLLECTION * 2) // to ensure the error happens only after results are pushed
+                error("Dummy error to mark failure on receiving messages")
+            }
         )
     }
 
