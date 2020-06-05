@@ -115,6 +115,24 @@ data class Request(val somethingImportant: Int)
 @Serializable
 data class Result(val number: Int)
 ```
+- To write a function supporting callback:
+```kotlin
+import headout.oss.ergo.annotations.Task
+import headout.oss.ergo.listeners.JobCallback
+
+object ExampleTasks {
+    @Task("callbackTask")
+    @JvmStatic
+    fun callbackTask(input: Int, callback: JobCallback<Int>): Unit {
+      runCatching<Unit> {
+        val result: Int = input
+        callback.success(result)
+      }.onFailure {
+        callback.error(it)
+      }
+    }
+}
+```
 
 #### Running the required service
 ##### 1. Using SQS Queue for receiving tasks
@@ -154,7 +172,31 @@ Runtime.getRuntime().addShutdownHook(object : Thread() {
   - Has TaskId to uniquely differentiate tasks
   - Can be used to refer to both regular and suspending functions
   - Function Parameters must be serializable (using @Serializable on the data class)
+  - It can either by synchronous or callback function:
+    - By default, it is a synchronous function with given return type as the job result type
+    - If the function has a parameter of subtype of `JobCallback<T>`, then the job result type is T and the return value of function is ignored.
 - TaskId => name to map to a particular function (must be unique in project).
-  - For SQS FIFO queues, it is analogous to **MessageGroupID**
+  - For SQS FIFO queues, it is analogous to **MessageGroupId**
   - For Pulsar, it is analogous to **Topic**
 - JobId => uniquely generated from the sender side to denote a particular running instance of a task.
+  - For SQS queues, it is analogous to **MessageId**
+  
+#### Message Schema
+- **MessageBody** must be stringified JSON for tasks with atleast one parameter. Key of the JSON will be the parameter name. Example:
+```kotlin
+import software.amazon.awssdk.services.sqs.model.SendMessageRequest
+
+val sendMsg = SendMessageRequest.builder()
+    .messageGroupId("exampleTask")
+    .messageBody("{\"i\": 1, \"hi\": \"whatever\"}")
+    .queueUrl(REQUEST_QUEUE_URL)
+    .build()
+
+// for task with following signature:
+@Task("exampleTask")
+@JvmStatic
+fun functionTask(i: Int, hi: String): Any
+```
+
+#### Complete flow with Airflow (SQS as message service)
+- [Notes and Sequence Diagram](https://drive.google.com/file/d/1MfT7_k4nEuoxqbdWqhYCKEkye5d8dBeR/view?usp=sharing)
