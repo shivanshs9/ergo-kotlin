@@ -35,7 +35,7 @@ class SqsMsgService(
 
     private val receiveRequest by lazy {
         ReceiveMessageRequest.builder()
-            .messageAttributeNames(MessageSystemAttributeName.MESSAGE_GROUP_ID.toString())
+            .attributeNamesWithStrings(MessageSystemAttributeName.MESSAGE_GROUP_ID.toString())
             .queueUrl(requestQueueUrl)
             .maxNumberOfMessages(MAX_BUFFERED_MESSAGES)
             .waitTimeSeconds(20)

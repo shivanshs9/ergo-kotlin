@@ -9,6 +9,7 @@ dependencies {
     implementsCommon()
     implementsSerialization()
     implementsCoroutine()
+    implementsReflection()
     api(project(":ergo-annotations"))
 
     testImplementation(project(":ergo-processor"))

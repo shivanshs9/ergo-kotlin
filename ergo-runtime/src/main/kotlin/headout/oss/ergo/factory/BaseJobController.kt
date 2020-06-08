@@ -26,8 +26,9 @@ abstract class BaseJobController {
         return parser.newTaskController(taskId, jobId, requestData)
     }
 
-    suspend fun runJob(taskId: TaskId, jobId: JobId, rawData: String): JobResult<*> = withContext(Dispatchers.Main) {
-        val controller = createTaskController(taskId, jobId, rawData)
-        controller.execute()
-    }
+    suspend fun runJob(taskId: TaskId, jobId: JobId, rawData: String): JobResult<*> =
+        withContext(Dispatchers.Unconfined) {
+            val controller = createTaskController(taskId, jobId, rawData)
+            controller.execute()
+        }
 }

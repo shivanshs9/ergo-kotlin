@@ -17,7 +17,7 @@ val TASK_BODIES = listOf(
 )
 val LOCAL_REGION: Region = Region.of("default")
 val LOCAL_ENDPOINT: URI = URI.create("http://localhost:9324")
-const val QUEUE_URL = "http://localhost:9324/queue/default"
+const val QUEUE_URL = "http://localhost:9324/queue/fifo"
 
 fun CoroutineScope.produceTasks() = launch {
     println("${Thread.currentThread().name} Producing tasks")
@@ -26,16 +26,14 @@ fun CoroutineScope.produceTasks() = launch {
         .region(LOCAL_REGION)
         .build()
 
-    var id = 0
     while (isActive) {
-        id++
         val taskIndex = TASKS.indices.random()
         val sendMsg = SendMessageRequest.builder()
             .messageGroupId(TASKS[taskIndex])
             .messageBody(TASK_BODIES[taskIndex])
             .queueUrl(QUEUE_URL)
             .build()
-        sqsClient.sendMessage(sendMsg)
+        val id = sqsClient.sendMessage(sendMsg).messageId()
         println("Message sent with id: $id")
         delay((1000L..5000L).random())
     }
