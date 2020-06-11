@@ -93,9 +93,11 @@ class SqsMsgService(
                     }
                 }
                 timeoutResultCollect.onReceive {
-                    println("TIMEOUT: Result Collect!")
-                    pushResults(bufferedResults.toList())
-                    bufferedResults.clear()
+                    if (bufferedResults.isNotEmpty()) {
+                        println("TIMEOUT: Result Collect!")
+                        pushResults(bufferedResults.toList())
+                        bufferedResults.clear()
+                    }
                 }
             }
         }
