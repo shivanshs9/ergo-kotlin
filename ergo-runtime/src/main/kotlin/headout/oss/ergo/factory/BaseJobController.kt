@@ -6,7 +6,7 @@ import headout.oss.ergo.models.JobId
 import headout.oss.ergo.models.JobResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.JsonDecodingException
+import kotlinx.serialization.SerializationException
 
 /**
  * Created by shivanshs9 on 24/05/20.
@@ -19,7 +19,7 @@ abstract class BaseJobController {
     private suspend fun createTaskController(taskId: TaskId, jobId: JobId, rawData: String): BaseTaskController<*, *> {
         val requestData = parser.runCatching { parseRequestData(taskId, rawData) }.getOrElse {
             throw when (it) {
-                is JsonDecodingException -> ParseRequestError(it)
+                is SerializationException -> ParseRequestError(it)
                 else -> it
             }
         }
