@@ -17,7 +17,8 @@ val TASK_BODIES = listOf(
 )
 val LOCAL_REGION: Region = Region.of("default")
 val LOCAL_ENDPOINT: URI = URI.create("http://localhost:9324")
-const val QUEUE_URL = "http://localhost:9324/queue/fifo"
+const val QUEUE_URL = "http://localhost:9324/queue/fifo_req"
+const val RESULT_QUEUE_URL = "http://localhost:9324/queue/fifo_res"
 
 fun CoroutineScope.produceTasks() = launch {
     println("${Thread.currentThread().name} Producing tasks")
@@ -41,18 +42,18 @@ fun CoroutineScope.produceTasks() = launch {
 
 fun main() = runBlocking {
     println("${Thread.currentThread().name} Starting program")
-    val job = produceTasks()
+//    val job = produceTasks()
     val sqsClient = SqsAsyncClient.builder()
         .endpointOverride(LOCAL_ENDPOINT)
         .region(LOCAL_REGION)
         .build()
-    val service = SqsMsgService(sqsClient, QUEUE_URL)
-    service.start()
+    val service = SqsMsgService(sqsClient, QUEUE_URL, RESULT_QUEUE_URL)
+    val job = service.start()
     Runtime.getRuntime().addShutdownHook(object : Thread() {
         override fun run() {
             super.run()
             service.stop()
-            job.cancel()
+//            job.cancel()
         }
     })
     job.join()

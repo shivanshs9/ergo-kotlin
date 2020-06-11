@@ -52,7 +52,7 @@ class SqsMsgService(
         produce(Dispatchers.IO, CAPACITY_REQUEST_BUFFER) {
             repeatUntilCancelled(BaseMsgService.Companion::collectCaughtExceptions) {
                 val messages = sqs.receiveMessage(receiveRequest).await().messages()
-                println(messages)
+                println("Received messages - $messages")
                 for (msg in messages) {
                     val groupId = msg.attributes()[MessageSystemAttributeName.MESSAGE_GROUP_ID]
                         ?: error("Message doesn't have 'MessageGroupId' key!")
@@ -75,22 +75,25 @@ class SqsMsgService(
                         is SuccessResultCapture -> handleSuccess(capture)
                         is RespondResultCapture -> {
                             bufferedResults.add(capture.result)
+                            println("Added result of job '${capture.result.jobId}' to buffer (size = ${bufferedResults.size})")
                             if (bufferedResults.size == MAX_BUFFERED_MESSAGES) {
                                 pushResults(bufferedResults.toList())
                                 bufferedResults.clear()
                             }
                         }
                         is PingMessageCapture -> if (pendingJobs.contains(capture.request.jobId)) {
+                            println("PING: job '${capture.request.jobId}' still pending (attempt ${capture.attempt})")
                             val newTimeout = defaultVisibilityTimeout * (capture.attempt + 1)
                             changeVisibilityTimeout(capture.request, newTimeout.toInt())
                             captures.sendDelayed(
                                 PingMessageCapture(capture.request, capture.attempt + 1),
                                 defaultPingMessageDelay
                             )
-                        }
+                        } else println("PING: jobs - $pendingJobs")
                     }
                 }
                 timeoutResultCollect.onReceive {
+                    println("TIMEOUT: Result Collect!")
                     pushResults(bufferedResults.toList())
                     bufferedResults.clear()
                 }
@@ -104,11 +107,13 @@ class SqsMsgService(
         deleteMessage(resultCapture.request)
 
     private suspend fun pushResults(jobResults: List<JobResult<*>>) = launch(currentCoroutineContext()) {
-        val msgEntries = jobResults.map {
-            val msgBody = parseResult(it)
+        println("Pushing ${jobResults.size} results!")
+        val msgEntries = jobResults.mapIndexed { index, jobResult ->
+            val msgBody = parseResult(jobResult)
             SendMessageBatchRequestEntry.builder()
+                .id(index.toString())
                 .messageBody(msgBody)
-                .messageGroupId(it.taskId)
+                .messageGroupId(jobResult.taskId)
                 .build()
         }
         val sendRequest = SendMessageBatchRequest.builder()
@@ -127,6 +132,7 @@ class SqsMsgService(
 
     private suspend fun changeVisibilityTimeout(request: RequestMsg<Message>, visibilityTimeout: Int) =
         launch(currentCoroutineContext()) {
+            println("Change visibility timeout of message with jobId '${request.jobId}' to $visibilityTimeout")
             sqs.changeMessageVisibility {
                 it.queueUrl(requestQueueUrl)
                 it.receiptHandle(request.message.receiptHandle())
@@ -135,6 +141,7 @@ class SqsMsgService(
         }
 
     private suspend fun deleteMessage(request: RequestMsg<Message>) = launch(currentCoroutineContext()) {
+        println("Deleting message with jobId - ${request.jobId}")
         sqs.deleteMessage {
             it.queueUrl(requestQueueUrl)
             it.receiptHandle(request.message.receiptHandle())
