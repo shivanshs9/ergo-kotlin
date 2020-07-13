@@ -14,7 +14,6 @@ dependencies {
     implementsSerialization()
     implementsCoroutine()
     implementsAwsSqs()
-    implementation(project(":ergo-runtime"))
     kapt(project(":ergo-processor"))
     implementation(project(":ergo-service-sqs"))
 }

@@ -5,5 +5,6 @@ include(
     ":ergo-annotations",
     ":ergo-processor",
     "ergo-service-sqs",
+    "ergo-spring",
     "sample"
 )
