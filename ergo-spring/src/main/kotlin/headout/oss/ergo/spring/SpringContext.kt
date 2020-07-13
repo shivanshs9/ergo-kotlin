@@ -10,12 +10,7 @@ import kotlin.reflect.KClass
  */
 @Component
 class SpringContext : ApplicationContextAware {
-    init {
-        print("SpringContext booted!!")
-    }
-
     override fun setApplicationContext(applicationContext: ApplicationContext) {
-        print("SpringContext set context!!")
         context = applicationContext
     }
 
