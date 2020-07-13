@@ -38,10 +38,9 @@ class TaskBinder internal constructor(
                         else -> error("No arg found for '${it.name}' (${it.typeName}) in '${method.name}' method")
                     }
                 }
-                val methodRef = MemberName(targetClassName, method.name)
                 val isRunCatchNeeded = method.callbackParameter == null
                 if (isRunCatchNeeded) beginControlFlow("runCatching<%T>", method.returnType)
-                addStatement("%L.%M(${targetArgs.joinToString(", ")})", BindingSet.PROP_INSTANCE, methodRef)
+                addStatement("%L.%L(${targetArgs.joinToString(", ")})", BindingSet.PROP_INSTANCE, method.name)
                 if (isRunCatchNeeded) {
                     endControlFlow()
                     addStatement(".onSuccess($PARAM_NAME_CALLBACK::success)")
