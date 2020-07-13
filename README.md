@@ -1,11 +1,15 @@
 ## Ergo
 
 ### Introduction
+
 Ergo is a client library to run application tasks on a shared pool of workers. It is a generic implementation to handle offloading tasks. "Services" are written to actually receive the message and then the runtime "Job Controller" actually runs the relevant functions annotated with the provided "taskId".
 
 ### Installation
+
 #### Add dependencies to [kotlinx.serialization](https://github.com/Kotlin/kotlinx.serialization) (required by the generated code):
+
 - Kotlin DSL (build.gradle.kts)
+
 ```kotlin
 repositories {
     // artifacts are published to JCenter
@@ -21,7 +25,9 @@ dependencies {
   implementation("org.jetbrains.kotlinx:kotlinx-serialization-runtime:0.20.0") // JVM dependency
 }
 ```
+
 - Groovy DSL (build.gradle)
+
 ```gradle
 repositories {
     // artifacts are published to JCenter
@@ -38,34 +44,40 @@ dependencies {
 }
 ```
 
-#### Add dependencies to Ergo Runtime and annotation processor:
+#### Add dependencies to Ergo annotation processor:
+
 Add following to Gradle:
+
 - Kotlin DSL (build.gradle.kts)
+
 ```kotlin
 plugins {
   kotlin("kapt") version kotlinVersion // Enable kapt plugin for annotation processing
 }
 
 dependencies {
-  implementation(project(":ergo-runtime"))
   kapt(project(":ergo-processor"))
 }
 ```
+
 - Grovvy DSL (build.gradle)
+
 ```gradle
 plugins {
   id 'org.jetbrains.kotlin.kapt' version kotlinVersion // Enable kapt plugin for annotation processing
 }
 
 dependencies {
-  implementation project(":ergo-runtime")
   kapt project(":ergo-processor")
 }
 ```
 
-#### 1. Using SQS queue for receiving tasks
+#### Using SQS queue for receiving tasks
+
 Add following to Gradle:
+
 - Kotlin DSL (build.gradle.kts)
+
 ```kotlin
 dependencies {
   implementation(platform("software.amazon.awssdk:bom:2.13.26"))
@@ -73,7 +85,9 @@ dependencies {
   implementation(project(":ergo-service-sqs"))
 }
 ```
+
 - Groovy DSL (build.gradle)
+
 ```gradle
 dependencies {
   implementation platform("software.amazon.awssdk:bom:2.13.26")
@@ -82,22 +96,46 @@ dependencies {
 }
 ```
 
+#### Optional: Using Spring Services and Autowired properties
+
+Add following to Gradle:
+
+- Kotlin DSL (build.gradle.kts)
+
+```kotlin
+dependencies {
+  implementation(project(":ergo-spring"))
+}
+```
+
+- Groovy DSL (build.gradle)
+
+```gradle
+dependencies {
+  implementation project(":ergo-spring")
+}
+```
+
 ### How to use?
+
 #### Providing Task Metadata in codebase
-- Annotate the relevant static functions with `Task` and provide a suitable **taskId** as argument (will be later used in code generation to map the taskId to this function call)
+
+- Annotate the relevant functions with `Task` and provide a suitable **taskId** as argument (will be later used in code generation to map the taskId to this function call)
+
 ```kotlin
 import headout.oss.ergo.annotations.Task
 
-object ExampleTasks {
+class ExampleTasks {
     @Task("noArg")
-    @JvmStatic
     fun noArg(): Boolean {
       // some long running execution
       return true
     }
 }
 ```
+
 - If using custom data class as task parameter, make sure it's serializable. The return type must also be serializable:
+
 ```kotlin
 import headout.oss.ergo.annotations.Task
 import kotlinx.serialization.Serializable
@@ -115,14 +153,15 @@ data class Request(val somethingImportant: Int)
 @Serializable
 data class Result(val number: Int)
 ```
+
 - To write a function supporting callback:
+
 ```kotlin
 import headout.oss.ergo.annotations.Task
 import headout.oss.ergo.listeners.JobCallback
 
-object ExampleTasks {
+class ExampleTasks {
     @Task("callbackTask")
-    @JvmStatic
     fun callbackTask(input: Int, callback: JobCallback<Int>): Unit {
       runCatching<Unit> {
         val result: Int = input
@@ -135,8 +174,11 @@ object ExampleTasks {
 ```
 
 #### Running the required service
+
 ##### 1. Using SQS Queue for receiving tasks
+
 - Create SQS client and SQS Message Service:
+
 ```kotlin
 const val AWS_REGION: Region = ...
 // The following Queues must be of FIFO queue type since only FIFO queue supports MessageGroupId
@@ -148,15 +190,21 @@ val sqsClient = SqsAsyncClient.builder()
     .build()
 val service = SqsMsgService(sqsClient, REQUEST_QUEUE_URL, RESULT_QUEUE_URL)
 ```
+
 - Start the message service on application start:
+
 ```kotlin
 service.start() // Launches bunch of coroutines
 ```
+
 - When needed, stop the message service:
+
 ```kotlin
 service.stop()
 ```
+
 - To add a graceful shutdown of all worker coroutines, use `Runtime.addShutdownHook` function:
+
 ```kotlin
 Runtime.getRuntime().addShutdownHook(object : Thread() {
     override fun run() {
@@ -167,7 +215,9 @@ Runtime.getRuntime().addShutdownHook(object : Thread() {
 ```
 
 ### Architecture
+
 #### Terminology
+
 - Task => used to denote a executable function with given input and given output
   - Has TaskId to uniquely differentiate tasks
   - Can be used to refer to both regular and suspending functions
@@ -179,10 +229,13 @@ Runtime.getRuntime().addShutdownHook(object : Thread() {
   - For SQS FIFO queues, it is analogous to **MessageGroupId**
   - For Pulsar, it is analogous to **Topic**
 - JobId => uniquely generated from the sender side to denote a particular running instance of a task.
+
   - For SQS queues, it is analogous to **MessageId**
-  
+
 #### Message Schema
+
 - **MessageBody** must be stringified JSON for tasks with atleast one parameter. Key of the JSON will be the parameter name. Example:
+
 ```kotlin
 import software.amazon.awssdk.services.sqs.model.SendMessageRequest
 
@@ -194,9 +247,9 @@ val sendMsg = SendMessageRequest.builder()
 
 // for task with following signature:
 @Task("exampleTask")
-@JvmStatic
 fun functionTask(i: Int, hi: String): Any
 ```
 
 #### Complete flow with Airflow (SQS as message service)
+
 - [Notes and Sequence Diagram](https://drive.google.com/file/d/1MfT7_k4nEuoxqbdWqhYCKEkye5d8dBeR/view?usp=sharing)
