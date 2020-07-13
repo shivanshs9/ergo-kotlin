@@ -41,6 +41,8 @@ fun CoroutineScope.produceTasks() = launch {
 }
 
 fun main() = runBlocking {
+    MySpringApplication.main()
+
     println("${Thread.currentThread().name} Starting program")
 //    val job = produceTasks()
     val sqsClient = SqsAsyncClient.builder()

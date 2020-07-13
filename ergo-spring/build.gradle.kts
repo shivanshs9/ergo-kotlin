@@ -16,6 +16,7 @@ dependencies {
     implementsCoroutine()
     implementation(Libraries.coroutineJdk8)
     implementation(project(":ergo-runtime"))
+    implementsSpring()
 
     kaptTest(project(":ergo-processor"))
     testImplementsCommon()
