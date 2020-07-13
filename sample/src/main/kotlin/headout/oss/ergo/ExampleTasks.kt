@@ -16,5 +16,10 @@ object ExampleTasks {
     fun oneArg(value: Int): Result = Result(value)
 }
 
+class InstanceClassTasks {
+    @Task("instance_noArg")
+    fun noArg(): Boolean = true
+}
+
 @Serializable
 data class Result(val result: Int)
