@@ -56,8 +56,8 @@ class JobParserBinder(
                     )
                     else addStatement("%S -> %T", taskBind.task.taskId, emptyRequestClassName)
                 }
-                addStatement("else -> %T", emptyRequestClassName)
             }
+            addStatement("else -> %T", emptyRequestClassName)
         }
         .endControlFlow()
         .build()

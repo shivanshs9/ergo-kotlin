@@ -29,8 +29,6 @@ class TaskBinder internal constructor(
             .addParameter(PARAM_NAME_REQUEST, getRequestType(requestDataClassName))
             .addParameter(PARAM_NAME_CALLBACK, method.callbackType)
             .apply {
-                // TODO: Add support for non-static too
-//                if (!method.isStatic) error("Only static task functions are supported for now!")
                 val targetArgs = method.getTargetArguments("${PARAM_NAME_REQUEST}.requestData.") {
                     when {
                         it.isSubtypeOf(JobRequest::class) -> PARAM_NAME_REQUEST
