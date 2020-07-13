@@ -1,11 +1,13 @@
 package headout.oss.ergo.processors
 
 import com.squareup.kotlinpoet.*
+import com.squareup.kotlinpoet.MemberName.Companion.member
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import headout.oss.ergo.annotations.Task
 import headout.oss.ergo.annotations.TaskId
 import headout.oss.ergo.exceptions.ExceptionUtils
 import headout.oss.ergo.factory.BaseTaskController
+import headout.oss.ergo.factory.InstanceLocatorFactory
 import headout.oss.ergo.models.JobId
 import headout.oss.ergo.models.JobRequest
 import headout.oss.ergo.models.JobRequestData
@@ -49,6 +51,12 @@ class BindingSet internal constructor(
     private fun createType(): TypeSpec = TypeSpec.classBuilder(bindingClassName.simpleName)
         .addModifiers(KModifier.PUBLIC)
         .addOriginatingElement(enclosingElement)
+        .apply {
+            val instanceProp = PropertySpec.builder(PROP_INSTANCE, targetType, KModifier.PRIVATE)
+                .initializer("%M(%L)", InstanceLocatorFactory::class.member("getInstance"), "${enclosingElement.simpleName}::class")
+                .build()
+            addProperty(instanceProp)
+        }
         .addTypeVariables(*classTypeVariables)
         .superclass(BaseTaskController::class, *classTypeVariables)
         .primaryConstructor(
@@ -88,7 +96,7 @@ class BindingSet internal constructor(
                     it.method.callbackType
                 )
             }
-            addStatement("else -> %M($PARAM_TASKID)", MemberName(ExceptionUtils::class.asClassName(), "taskNotFound"))
+            addStatement("else -> %M($PARAM_TASKID)", ExceptionUtils::class.member("taskNotFound"))
         }
         .endControlFlow()
         .build()
@@ -131,6 +139,8 @@ class BindingSet internal constructor(
 
         const val ARG_JOB_REQUEST = "jobRequest"
         const val ARG_JOB_CALLBACK = "jobCallback"
+
+        const val PROP_INSTANCE = "instance"
 
         fun newBuilder(enclosingElement: TypeElement, processingEnvironment: KotlinProcessingEnvironment): Builder {
             println("CLASS MODIFIERS == ${enclosingElement.modifiers}")

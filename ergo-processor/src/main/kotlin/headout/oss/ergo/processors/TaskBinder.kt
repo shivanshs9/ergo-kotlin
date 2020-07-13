@@ -30,7 +30,7 @@ class TaskBinder internal constructor(
             .addParameter(PARAM_NAME_CALLBACK, method.callbackType)
             .apply {
                 // TODO: Add support for non-static too
-                if (!method.isStatic) error("Only static task functions are supported for now!")
+//                if (!method.isStatic) error("Only static task functions are supported for now!")
                 val targetArgs = method.getTargetArguments("${PARAM_NAME_REQUEST}.requestData.") {
                     when {
                         it.isSubtypeOf(JobRequest::class) -> PARAM_NAME_REQUEST
@@ -41,7 +41,7 @@ class TaskBinder internal constructor(
                 val methodRef = MemberName(targetClassName, method.name)
                 val isRunCatchNeeded = method.callbackParameter == null
                 if (isRunCatchNeeded) beginControlFlow("runCatching<%T>", method.returnType)
-                addStatement("%T.%M(${targetArgs.joinToString(", ")})", targetClassName, methodRef)
+                addStatement("%L.%M(${targetArgs.joinToString(", ")})", BindingSet.PROP_INSTANCE, methodRef)
                 if (isRunCatchNeeded) {
                     endControlFlow()
                     addStatement(".onSuccess($PARAM_NAME_CALLBACK::success)")
