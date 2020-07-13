@@ -56,7 +56,6 @@ class TaskProcessor : KotlinAbstractProcessor() {
 
         val parameters = element.parameters.map { MethodParameter(it) }
 
-        println("METHOD MODIFIERS == ${element.modifiers}")
         val methodSignature = MethodSignature(
             methodName,
             parameters,

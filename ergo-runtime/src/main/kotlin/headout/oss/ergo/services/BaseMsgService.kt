@@ -14,11 +14,14 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.launch
+import mu.KotlinLogging
 import java.lang.Thread.currentThread
 
 /**
  * Created by shivanshs9 on 28/05/20.
  */
+private val logger = KotlinLogging.logger {}
+
 abstract class BaseMsgService<T>(
     scope: CoroutineScope,
     private val numWorkers: Int = DEFAULT_NUMBER_WORKERS
@@ -32,8 +35,10 @@ abstract class BaseMsgService<T>(
                 val result = runCatching {
                     processRequest(request)
                 }.onFailure { exc ->
-                    println("Worker '$workerId' on '${currentThread().name}' caught exception trying to process message '${request.jobId}'")
-                    exc.printStackTrace()
+                    logger.error(
+                        "Worker '$workerId' on '${currentThread().name}' caught exception trying to process message '${request.jobId}'",
+                        exc
+                    )
                     collectCaughtExceptions(exc)
                 }.getOrElse {
                     val error = when {

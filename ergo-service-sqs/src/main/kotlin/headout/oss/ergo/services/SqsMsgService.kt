@@ -12,6 +12,8 @@ import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.produce
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.selects.select
+import mu.KotlinLogging
+import org.slf4j.MarkerFactory
 import software.amazon.awssdk.services.sqs.SqsAsyncClient
 import software.amazon.awssdk.services.sqs.model.*
 import java.util.concurrent.TimeUnit
@@ -20,6 +22,8 @@ import kotlin.math.round
 /**
  * Created by shivanshs9 on 28/05/20.
  */
+private val logger = KotlinLogging.logger {}
+
 @ExperimentalCoroutinesApi
 class SqsMsgService(
     private val sqs: SqsAsyncClient,
@@ -52,7 +56,7 @@ class SqsMsgService(
         produce(Dispatchers.IO, CAPACITY_REQUEST_BUFFER) {
             repeatUntilCancelled(BaseMsgService.Companion::collectCaughtExceptions) {
                 val messages = sqs.receiveMessage(receiveRequest).await().messages()
-                println("Received messages - $messages")
+                logger.info { "Received ${messages.size} messages - $messages" }
                 for (msg in messages) {
                     val groupId = msg.attributes()[MessageSystemAttributeName.MESSAGE_GROUP_ID]
                         ?: error("Message doesn't have 'MessageGroupId' key!")
@@ -69,32 +73,32 @@ class SqsMsgService(
         repeatUntilCancelled(BaseMsgService.Companion::collectCaughtExceptions) {
             select {
                 captures.onReceive { capture ->
-                    println("received $capture")
+                    logger.info("received '$capture' with request ${capture.request}")
                     when (capture) {
                         is ErrorResultCapture -> handleError(capture)
                         is SuccessResultCapture -> handleSuccess(capture)
                         is RespondResultCapture -> {
                             bufferedResults.add(capture.result)
-                            println("Added result of job '${capture.result.jobId}' to buffer (size = ${bufferedResults.size})")
+                            logger.debug(MARKER_RESULT_BUFFER) { "Added result of job '${capture.result.jobId}' to buffer (size = ${bufferedResults.size})" }
                             if (bufferedResults.size == MAX_BUFFERED_MESSAGES) {
                                 pushResults(bufferedResults.toList())
                                 bufferedResults.clear()
                             }
                         }
                         is PingMessageCapture -> if (pendingJobs.contains(capture.request.jobId)) {
-                            println("PING: job '${capture.request.jobId}' still pending (attempt ${capture.attempt})")
+                            logger.debug(MARKER_RESULT_BUFFER) { "PING: job '${capture.request.jobId}' still pending (attempt ${capture.attempt})" }
                             val newTimeout = defaultVisibilityTimeout * (capture.attempt + 1)
                             changeVisibilityTimeout(capture.request, newTimeout.toInt())
                             captures.sendDelayed(
                                 PingMessageCapture(capture.request, capture.attempt + 1),
                                 defaultPingMessageDelay
                             )
-                        } else println("PING: jobs - $pendingJobs")
+                        } else logger.debug(MARKER_RESULT_BUFFER) { "PING: jobs - $pendingJobs" }
                     }
                 }
                 timeoutResultCollect.onReceive {
                     if (bufferedResults.isNotEmpty()) {
-                        println("TIMEOUT: Result Collect!")
+                        logger.debug(MARKER_RESULT_BUFFER, "TIMEOUT: Result Collect!")
                         pushResults(bufferedResults.toList())
                         bufferedResults.clear()
                     }
@@ -109,7 +113,7 @@ class SqsMsgService(
         deleteMessage(resultCapture.request)
 
     private suspend fun pushResults(jobResults: List<JobResult<*>>) = launch(currentCoroutineContext()) {
-        println("Pushing ${jobResults.size} results!")
+        logger.info { "Pushing ${jobResults.size} results!" }
         val msgEntries = jobResults.mapIndexed { index, jobResult ->
             val msgBody = parseResult(jobResult)
             SendMessageBatchRequestEntry.builder()
@@ -125,16 +129,21 @@ class SqsMsgService(
 
         val response = sqs.sendMessageBatch(sendRequest).await()
         response.successful().forEach {
-            println("Response message '${it.messageId()}' successfully sent!")
+            logger.info {
+                "Response message '${it.messageId()}' for '${jobResults[it.id().toInt()]}' successfully sent!"
+            }
         }
         response.failed().forEach {
-            println("Response message, indexed '${it.id()}', failed to send with code '${it.code()}'!")
+            logger.warn {
+                "Response message, indexed '${it.id()}' for '${jobResults[it.id()
+                    .toInt()]}', failed to send with code '${it.code()}'!"
+            }
         }
     }
 
     private suspend fun changeVisibilityTimeout(request: RequestMsg<Message>, visibilityTimeout: Int) =
         launch(currentCoroutineContext()) {
-            println("Change visibility timeout of message with jobId '${request.jobId}' to $visibilityTimeout")
+            logger.info { "Change visibility timeout of message with jobId '${request.jobId}' to $visibilityTimeout" }
             sqs.changeMessageVisibility {
                 it.queueUrl(requestQueueUrl)
                 it.receiptHandle(request.message.receiptHandle())
@@ -143,7 +152,7 @@ class SqsMsgService(
         }
 
     private suspend fun deleteMessage(request: RequestMsg<Message>) = launch(currentCoroutineContext()) {
-        println("Deleting message with jobId - ${request.jobId}")
+        logger.info { "Deleting message with jobId - ${request.jobId}" }
         sqs.deleteMessage {
             it.queueUrl(requestQueueUrl)
             it.receiptHandle(request.message.receiptHandle())
@@ -154,6 +163,8 @@ class SqsMsgService(
         const val MAX_BUFFERED_MESSAGES = 10
         val DEFAULT_VISIBILITY_TIMEOUT = TimeUnit.MINUTES.toSeconds(20)
         val TIMEOUT_RESULT_COLLECTION: Long = TimeUnit.MINUTES.toMillis(2)
+
+        private val MARKER_RESULT_BUFFER = MarkerFactory.getMarker("Buffer")
 
         override fun toTaskId(value: String): TaskId = value
 

@@ -143,7 +143,6 @@ class BindingSet internal constructor(
         const val PROP_INSTANCE = "instance"
 
         fun newBuilder(enclosingElement: TypeElement, processingEnvironment: KotlinProcessingEnvironment): Builder {
-            println("CLASS MODIFIERS == ${enclosingElement.modifiers}")
             val isFinal = enclosingElement.modifiers.contains(Modifier.FINAL)
             return Builder(enclosingElement, isFinal, processingEnvironment)
         }

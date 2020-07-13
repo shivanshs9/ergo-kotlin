@@ -26,6 +26,7 @@ object Libraries {
     const val springCore = "org.springframework:spring-core:${Versions.spring}"
     const val springContext = "org.springframework:spring-context:${Versions.spring}"
     const val springBeans = "org.springframework:spring-beans:${Versions.spring}"
+    const val logging = "io.github.microutils:kotlin-logging:1.7.10"
 }
 
 fun DependencyHandler.implementsKotlinPoet() {
@@ -46,6 +47,7 @@ fun DependencyHandler.implementsSerialization() {
 
 fun DependencyHandler.implementsCommon() {
     add("implementation", kotlin("stdlib-jdk8"))
+    add("implementation", Libraries.logging)
 }
 
 fun DependencyHandler.implementsCoroutine() {
