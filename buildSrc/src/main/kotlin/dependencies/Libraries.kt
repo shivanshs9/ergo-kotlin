@@ -54,9 +54,9 @@ fun DependencyHandler.implementsCoroutine() {
     add("implementation", Libraries.coroutine)
 }
 
-fun DependencyHandler.implementsAwsSqs(isApi: Boolean = false) {
-    add(if (isApi) "api" else "implementation", platform(Libraries.aws2Bom))
-    add(if (isApi) "api" else "implementation", Libraries.aws2Sqs)
+fun DependencyHandler.implementsAwsSqs() {
+    add("implementation", platform(Libraries.aws2Bom))
+    add("implementation", Libraries.aws2Sqs)
 }
 
 fun DependencyHandler.implementsReflection() {

@@ -15,10 +15,10 @@ dependencies {
     implementsSerialization()
     implementsCoroutine()
     implementation(Libraries.coroutineJdk8)
-    implementsAwsSqs(isApi = true)
+    implementsAwsSqs()
     api(project(":ergo-runtime"))
-
     kaptTest(project(":ergo-processor"))
+
     testImplementsCommon()
     testImplementsCoroutines()
     testImplementsMock()
