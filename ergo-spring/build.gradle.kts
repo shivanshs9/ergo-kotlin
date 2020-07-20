@@ -1,4 +1,5 @@
 import dependencies.*
+import publish.GithubPackage
 
 plugins {
     kotlinJvm()
@@ -22,6 +23,10 @@ dependencies {
     testImplementsCommon()
     testImplementsCoroutines()
     testImplementsMock()
+}
+
+publishing {
+    GithubPackage(project)
 }
 
 apply(from = rootProject.file("gradle/common.gradle.kts"))
