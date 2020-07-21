@@ -1,4 +1,5 @@
 import dependencies.*
+import publish.GithubPackage
 
 plugins {
     kotlinJvm()
@@ -15,6 +16,10 @@ dependencies {
     testImplementation(project(":ergo-processor"))
     testImplementsCommon()
     testImplementsCodeGen()
+}
+
+publishing {
+    GithubPackage(project)
 }
 
 apply(from = rootProject.file("gradle/common.gradle.kts"))
