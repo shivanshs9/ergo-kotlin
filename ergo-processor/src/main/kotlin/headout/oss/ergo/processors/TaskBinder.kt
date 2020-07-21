@@ -17,7 +17,7 @@ class TaskBinder internal constructor(
     val methodName: String,
     val task: Task,
     val method: MethodSignature,
-    val targetClassName: ClassName
+    private val targetClassName: ClassName
 ) {
     val requestDataClassName by lazy {
         if (isRequestDataNeeded()) ClassName(targetClassName.packageName, "$PREFIX_CLASS_REQUEST_DATA$methodName")
@@ -38,7 +38,8 @@ class TaskBinder internal constructor(
                 }
                 val isRunCatchNeeded = method.callbackParameter == null
                 if (isRunCatchNeeded) beginControlFlow("runCatching<%T>", method.returnType)
-                addStatement("%L.%L(${targetArgs.joinToString(", ")})", BindingSet.PROP_INSTANCE, method.name)
+                val methodReceiver = if (method.isStatic) targetClassName.simpleName else BindingSet.PROP_INSTANCE
+                addStatement("%L.%L(${targetArgs.joinToString(", ")})", methodReceiver, method.name)
                 if (isRunCatchNeeded) {
                     endControlFlow()
                     addStatement(".onSuccess($PARAM_NAME_CALLBACK::success)")

@@ -91,6 +91,25 @@ class JavaTaskTest {
         assertResult(result)
     }
 
+    @Test
+    fun noArgWithUnitResult() {
+        val source = """
+            package example.tasks;
+            
+            import headout.oss.ergo.annotations.Task;
+            
+            class ExampleTask {
+                @Task(taskId="noArgWithUnitResult")
+                public void noArgWithUnitResult() {
+                    System.out.println("doing some work...");
+                }
+            }
+        """.trimIndent()
+
+        val result = compile(source)
+        assertResult(result)
+    }
+
     private fun assertResult(result: KotlinCompilation.Result) {
         result.sourcesGeneratedByAnnotationProcessor.forEach {
             println(it.canonicalPath)
