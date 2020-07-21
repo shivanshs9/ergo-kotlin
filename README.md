@@ -8,12 +8,14 @@ Ergo is a client library to run application tasks on a shared pool of workers. I
 
 #### Add dependencies to [kotlinx.serialization](https://github.com/Kotlin/kotlinx.serialization) (required by the generated code):
 
-- Kotlin DSL (build.gradle.kts)
+<details open>
+<summary>Kotlin DSL (build.gradle.kts)</summary>
 
 ```kotlin
 repositories {
     // artifacts are published to JCenter
     jcenter()
+    maven(url="https://jitpack.io")
 }
 
 plugins {
@@ -26,12 +28,16 @@ dependencies {
 }
 ```
 
-- Groovy DSL (build.gradle)
+</details>
+
+<details>
+<summary>Groovy (build.gradle)</summary>
 
 ```gradle
 repositories {
     // artifacts are published to JCenter
     jcenter()
+    maven { url "https://jitpack.io" }
 }
 
 plugins {
@@ -44,11 +50,14 @@ dependencies {
 }
 ```
 
+</details>
+
 #### Add dependencies to Ergo annotation processor:
 
 Add following to Gradle:
 
-- Kotlin DSL (build.gradle.kts)
+<details open>
+<summary>Kotlin DSL (build.gradle.kts)</summary>
 
 ```kotlin
 plugins {
@@ -56,11 +65,14 @@ plugins {
 }
 
 dependencies {
-  kapt(project(":ergo-processor"))
+  kapt("com.github.headout.ergo-kotlin:ergo-processor:1.0.0")
 }
 ```
 
-- Grovvy DSL (build.gradle)
+</details>
+
+<details>
+<summary>Groovy (build.gradle)</summary>
 
 ```gradle
 plugins {
@@ -68,53 +80,67 @@ plugins {
 }
 
 dependencies {
-  kapt project(":ergo-processor")
+  kapt "com.github.headout.ergo-kotlin:ergo-processor:1.0.0"
 }
 ```
+
+</details>
 
 #### Using SQS queue for receiving tasks
 
 Add following to Gradle:
 
-- Kotlin DSL (build.gradle.kts)
+<details open>
+<summary>Kotlin DSL (build.gradle.kts)</summary>
 
 ```kotlin
 dependencies {
   implementation(platform("software.amazon.awssdk:bom:2.13.26"))
   implementation("software.amazon.awssdk:sqs")
-  implementation(project(":ergo-service-sqs"))
+  implementation("com.github.headout.ergo-kotlin:ergo-service-sqs:1.0.0")
 }
 ```
 
-- Groovy DSL (build.gradle)
+</details>
+
+<details>
+<summary>Groovy (build.gradle)</summary>
 
 ```gradle
 dependencies {
   implementation platform("software.amazon.awssdk:bom:2.13.26")
   implementation "software.amazon.awssdk:sqs"
-  implementation project(":ergo-service-sqs")
+  implementation "com.github.headout.ergo-kotlin:ergo-service-sqs:1.0.0"
 }
 ```
+
+</details>
 
 #### Optional: Using Spring Services and Autowired properties
 
 Add following to Gradle:
 
-- Kotlin DSL (build.gradle.kts)
+<details open>
+<summary>Kotlin DSL (build.gradle.kts)</summary>
 
 ```kotlin
 dependencies {
-  implementation(project(":ergo-spring"))
+  implementation("com.github.headout.ergo-kotlin:ergo-spring:1.0.0")
 }
 ```
 
-- Groovy DSL (build.gradle)
+</details>
+
+<details>
+<summary>Groovy (build.gradle)</summary>
 
 ```gradle
 dependencies {
-  implementation project(":ergo-spring")
+  implementation "com.github.headout.ergo-kotlin:ergo-spring:1.0.0"
 }
 ```
+
+</details>
 
 ### How to use?
 
