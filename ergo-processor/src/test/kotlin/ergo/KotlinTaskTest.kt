@@ -129,6 +129,25 @@ class KotlinTaskTest {
         assertResult(result)
     }
 
+    @Test
+    fun noArgWithUnitResult() {
+        val source = """
+            package example.tasks
+            
+            import headout.oss.ergo.annotations.Task
+            
+            class ExampleTask {
+                @Task(taskId="noArgWithUnitResult")
+                fun noArgWithUnitResult(): Unit {
+                    println("doing some work...")
+                }
+            }
+        """.trimIndent()
+
+        val result = compile(source)
+        assertResult(result)
+    }
+
     private fun assertResult(result: KotlinCompilation.Result, exitCode: ExitCode = ExitCode.OK) {
         result.sourcesGeneratedByAnnotationProcessor.forEach {
             println(it.canonicalPath)

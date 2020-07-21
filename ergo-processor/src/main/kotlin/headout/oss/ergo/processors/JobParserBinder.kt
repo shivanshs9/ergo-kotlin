@@ -109,13 +109,19 @@ class JobParserBinder(
                     val resultSerializer = BUILTIN_SERIALIZERS[resultClass]
                     val paramJobResultClass = jobResultClass.parameterizedBy(resultClass)
                     beginControlFlow("%S ->", taskBind.task.taskId)
-                    if (resultSerializer != null) addStatement(
-                        "val serializer = %T.serializer(%T.%M())",
-                        jobResultClass,
-                        resultClass,
-                        resultSerializer
-                    )
-                    else {
+                    if (resultSerializer != null) {
+                        if (resultSerializer == companionSerializerFunction) addStatement(
+                            "val serializer = %T.serializer(%T.%M())",
+                            jobResultClass,
+                            resultClass,
+                            resultSerializer
+                        )
+                        else addStatement(
+                            "val serializer = %T.serializer(%M())",
+                            jobResultClass,
+                            resultSerializer
+                        )
+                    } else {
 //                        require(resultClass.annotations.find { it.className == serializableClassName } != null) {
 //                            "Return type $resultClass of ${taskBind.method.name} must be annotated with $serializableClassName"
 //                        }
@@ -135,6 +141,8 @@ class JobParserBinder(
         .build()
 
     companion object {
+        private val companionSerializerFunction = MemberName("kotlinx.serialization.builtins", "serializer")
+
         private val BUILTIN_SERIALIZERS = mapOf(
             String::class to "serializer",
             Char::class to "serializer",
