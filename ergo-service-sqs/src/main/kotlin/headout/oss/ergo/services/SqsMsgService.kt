@@ -73,7 +73,7 @@ class SqsMsgService(
         repeatUntilCancelled(BaseMsgService.Companion::collectCaughtExceptions) {
             select {
                 captures.onReceive { capture ->
-                    logger.info("received '$capture' with request ${capture.request}")
+                    logger.info("event: '${capture::class.simpleName}', request: '${capture.request}'")
                     when (capture) {
                         is ErrorResultCapture -> handleError(capture)
                         is SuccessResultCapture -> handleSuccess(capture)
@@ -87,7 +87,8 @@ class SqsMsgService(
                         }
                         is PingMessageCapture -> if (pendingJobs.contains(capture.request.jobId)) {
                             logger.debug(MARKER_RESULT_BUFFER) { "PING: job '${capture.request.jobId}' still pending (attempt ${capture.attempt})" }
-                            val newTimeout = defaultVisibilityTimeout * (capture.attempt + 1)
+                            val newTimeout =
+                                getVisibilityTimeoutForAttempt(defaultVisibilityTimeout, capture.attempt + 1)
                             changeVisibilityTimeout(capture.request, newTimeout.toInt())
                             captures.sendDelayed(
                                 PingMessageCapture(capture.request, capture.attempt + 1),
@@ -161,6 +162,7 @@ class SqsMsgService(
 
     companion object : TaskServiceConversion {
         const val MAX_BUFFERED_MESSAGES = 10
+        private const val MAX_VISIBILITY_TIMEOUT = 43199.toLong()
         val DEFAULT_VISIBILITY_TIMEOUT = TimeUnit.MINUTES.toSeconds(20)
         val TIMEOUT_RESULT_COLLECTION: Long = TimeUnit.MINUTES.toMillis(2)
 
@@ -170,6 +172,9 @@ class SqsMsgService(
 
         override fun fromTaskId(taskId: TaskId): String = taskId
 
-        fun getPingDelay(visibilityTimeout: Long) = round(visibilityTimeout * 0.75).toLong()
+        fun getPingDelay(visibilityTimeout: Long) = TimeUnit.SECONDS.toMillis(round(visibilityTimeout * 0.75).toLong())
+
+        fun getVisibilityTimeoutForAttempt(visibilityTimeout: Long, attempt: Int) =
+            (visibilityTimeout * (attempt + 1)).coerceAtMost(MAX_VISIBILITY_TIMEOUT)
     }
 }
