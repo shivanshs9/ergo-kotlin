@@ -30,7 +30,7 @@ abstract class BaseMsgService<T>(
 
     fun start() = launch {
         val requests = collectRequests()
-        immortalWorkers(numWorkers) { workerId ->
+        immortalWorkers(numWorkers, exceptionHandler = Companion::collectCaughtExceptions) { workerId ->
             for (request in requests) {
                 val result = runCatching {
                     processRequest(request)

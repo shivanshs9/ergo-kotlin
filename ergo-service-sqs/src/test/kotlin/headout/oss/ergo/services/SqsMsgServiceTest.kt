@@ -65,6 +65,7 @@ class SqsMsgServiceTest : BaseTest() {
         msgService.start()
         coVerify {
             msgService.processRequest(any())
+            delay(DELAY_WAIT)
         }
         verify {
             msgService["handleError"](match<ErrorResultCapture<Message>> {
@@ -81,6 +82,7 @@ class SqsMsgServiceTest : BaseTest() {
         msgService.start()
         coVerify {
             msgService.processRequest(any())
+            delay(DELAY_WAIT)
         }
         verify {
             msgService["handleError"](match<ErrorResultCapture<Message>> {
@@ -115,6 +117,7 @@ class SqsMsgServiceTest : BaseTest() {
         msgService.start()
         coVerify {
             msgService.processRequest(any())
+            delay(DELAY_WAIT)
         }
         verify {
             sqsClient.deleteMessage(match<DeleteMessageRequest> {
@@ -246,7 +249,7 @@ class SqsMsgServiceTest : BaseTest() {
             .messages(
                 List(msgCount) {
                     Message.builder()
-                        .messageId(jobId)
+                        .messageId("$jobId-$it")
                         .apply {
                             taskId?.let {
                                 attributes(mapOf(MessageSystemAttributeName.MESSAGE_GROUP_ID to it))

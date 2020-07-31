@@ -20,6 +20,7 @@ object TestLibraries {
     const val jUnit = "junit:junit:${Versions.jUnit}"
     const val mockK = "io.mockk:mockk:${Versions.mockK}"
     const val kotlinxCoroutines = "org.jetbrains.kotlinx:kotlinx-coroutines-test:${Versions.coroutinesTest}"
+    const val simpleLogger = "org.slf4j:slf4j-simple:1.7.29"
 }
 
 fun DependencyHandler.testImplementsCodeGen() {
@@ -31,6 +32,7 @@ fun DependencyHandler.testImplementsCodeGen() {
 fun DependencyHandler.testImplementsCommon() {
     add("testApi", TestLibraries.jUnit)
     add("testImplementation", TestLibraries.truth)
+    add("testImplementation", TestLibraries.simpleLogger)
 }
 
 fun DependencyHandler.testImplementsMock() {

@@ -63,7 +63,7 @@ class SqsMsgService(
                     val requestMsg = RequestMsg(toTaskId(groupId), msg.messageId(), msg)
                     pendingJobs.add(requestMsg.jobId)
                     send(requestMsg)
-                    captures.sendDelayed(PingMessageCapture(requestMsg), defaultPingMessageDelay)
+                    sendDelayed(captures, PingMessageCapture(requestMsg), defaultPingMessageDelay)
                 }
             }
         }
@@ -90,7 +90,8 @@ class SqsMsgService(
                             val newTimeout =
                                 getVisibilityTimeoutForAttempt(defaultVisibilityTimeout, capture.attempt + 1)
                             changeVisibilityTimeout(capture.request, newTimeout.toInt())
-                            captures.sendDelayed(
+                            sendDelayed(
+                                captures,
                                 PingMessageCapture(capture.request, capture.attempt + 1),
                                 defaultPingMessageDelay
                             )

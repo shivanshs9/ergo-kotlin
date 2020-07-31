@@ -14,7 +14,7 @@ import kotlin.coroutines.EmptyCoroutineContext
  */
 private val logger = KotlinLogging.logger {}
 
-suspend fun CoroutineScope.repeatUntilCancelled(exceptionHandler: (Throwable) -> Unit = {}, block: suspend () -> Unit) {
+suspend fun CoroutineScope.repeatUntilCancelled(exceptionHandler: (Throwable) -> Unit, block: suspend () -> Unit) {
     while (isActive) {
         try {
             block()
@@ -38,16 +38,16 @@ fun CoroutineScope.workers(
 fun CoroutineScope.immortalWorkers(
     concurrency: Int,
     start: CoroutineStart = CoroutineStart.DEFAULT,
+    exceptionHandler: (Throwable) -> Unit = {},
     block: suspend CoroutineScope.(workedId: Int) -> Unit
-) = workers(concurrency, start) { repeatUntilCancelled { block(it) } }
+) = workers(concurrency, start) { repeatUntilCancelled(exceptionHandler) { block(it) } }
 
-suspend inline fun <reified E> SendChannel<E>.sendDelayed(element: E, delay: Long) = coroutineScope {
-    launch {
-        delay(delay)
-        send(element)
-    }
+suspend inline fun <reified E> CoroutineScope.sendDelayed(channel: SendChannel<E>, element: E, delay: Long) = launch {
+    delay(delay)
+    channel.send(element)
 }
 
+@ExperimentalCoroutinesApi
 fun CoroutineScope.ticker(
     delayMillis: Long,
     initialDelayMillis: Long = delayMillis,
@@ -57,7 +57,7 @@ fun CoroutineScope.ticker(
     require(initialDelayMillis >= 0) { "Expected non-negative initial delay, but has $initialDelayMillis ms" }
     return produce(Dispatchers.Unconfined + context, capacity = 0) {
         delay(initialDelayMillis)
-        channel.send(Unit)
-        while (isActive) channel.sendDelayed(Unit, delayMillis)
+        send(Unit)
+        while (isActive) sendDelayed(this, Unit, delayMillis)
     }
 }
