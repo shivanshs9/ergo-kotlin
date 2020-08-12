@@ -2,6 +2,7 @@ package headout.oss.ergo.processors
 
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
+import headout.oss.ergo.codegen.task.BindingSet
 import headout.oss.ergo.exceptions.ExceptionUtils
 import headout.oss.ergo.factory.IJobParser
 import headout.oss.ergo.factory.JsonFactory

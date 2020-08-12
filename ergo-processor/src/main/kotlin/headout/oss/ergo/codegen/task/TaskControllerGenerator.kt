@@ -1,34 +1,39 @@
-package headout.oss.ergo.processors
+package headout.oss.ergo.codegen.task
 
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.MemberName.Companion.member
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
+import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
 import headout.oss.ergo.annotations.Task
 import headout.oss.ergo.annotations.TaskId
+import headout.oss.ergo.codegen.api.MethodSignature
+import headout.oss.ergo.codegen.api.TargetType
+import headout.oss.ergo.codegen.api.TypeGenerator
 import headout.oss.ergo.exceptions.ExceptionUtils
 import headout.oss.ergo.factory.BaseTaskController
 import headout.oss.ergo.factory.InstanceLocatorFactory
 import headout.oss.ergo.models.JobId
 import headout.oss.ergo.models.JobRequest
 import headout.oss.ergo.models.JobRequestData
+import headout.oss.ergo.processors.TaskBinder
 import headout.oss.ergo.utils.addSuperclassConstructorParameters
 import headout.oss.ergo.utils.addTypeVariables
 import headout.oss.ergo.utils.getExecutableElement
 import headout.oss.ergo.utils.superclass
 import me.eugeniomarletti.kotlin.processing.KotlinProcessingEnvironment
-import javax.lang.model.element.*
 
 /**
  * Created by shivanshs9 on 20/05/20.
  */
-class BindingSet internal constructor(
+@KotlinPoetMetadataPreview
+class TaskControllerGenerator internal constructor(
     val enclosingElement: TypeElement,
     val targetType: TypeName,
     val bindingClassName: ClassName,
     val isFinal: Boolean,
     val tasks: List<TaskBinder>,
     private val processingEnvironment: KotlinProcessingEnvironment
-) {
+) : TypeGenerator {
     private val classTypeVariables by lazy {
         arrayOf(
             TypeVariableName.invoke(TYPE_ARG_REQUEST, JobRequestData::class.asTypeName()),
@@ -36,7 +41,7 @@ class BindingSet internal constructor(
         )
     }
 
-    fun brewKotlin(): FileSpec = createType().let { type ->
+    override fun brewKotlin(): FileSpec = createType().let { type ->
         FileSpec.builder(bindingClassName.packageName, type.name!!)
             .addType(type)
             .apply {
@@ -53,7 +58,11 @@ class BindingSet internal constructor(
         .addOriginatingElement(enclosingElement)
         .apply {
             val instanceProp = PropertySpec.builder(PROP_INSTANCE, targetType, KModifier.PRIVATE)
-                .initializer("%M(%L)", InstanceLocatorFactory::class.member("getInstance"), "${enclosingElement.simpleName}::class")
+                .initializer(
+                    "%M(%L)",
+                    InstanceLocatorFactory::class.member("getInstance"),
+                    "${enclosingElement.simpleName}::class"
+                )
                 .build()
             addProperty(instanceProp)
         }
@@ -66,7 +75,11 @@ class BindingSet internal constructor(
                 .addParameter(ParameterSpec(PARAM_REQUESTDATA, classTypeVariables[0]))
                 .build()
         )
-        .addSuperclassConstructorParameters(PARAM_TASKID, PARAM_JOBID, PARAM_REQUESTDATA)
+        .addSuperclassConstructorParameters(
+            PARAM_TASKID,
+            PARAM_JOBID,
+            PARAM_REQUESTDATA
+        )
         .apply {
             if (isFinal) addModifiers(KModifier.FINAL)
             addFunctions(createFunctions())
@@ -102,30 +115,32 @@ class BindingSet internal constructor(
         .build()
 
     class Builder internal constructor(
-        private val enclosingElement: TypeElement,
-        private val isFinal: Boolean,
+        private val targetType: TargetType,
         private val processingEnvironment: KotlinProcessingEnvironment
     ) {
-        private val targetType by lazy { enclosingElement.asClassName() }
+        //        private val targetType by lazy { sourceClass.asClassName() }
         private val taskBuilders: MutableSet<TaskBinder.Builder> = mutableSetOf()
 
         fun addMethod(task: Task, methodSignature: MethodSignature): Boolean {
-            val taskBuilder = TaskBinder.newBuilder(task, targetType).apply {
+            val taskBuilder = TaskBinder.newBuilder(
+                task,
+                targetType
+            ).apply {
                 this.methodSignature = methodSignature
             }.also { taskBuilders.add(it) }
             return true
         }
 
-        fun build(): BindingSet {
+        fun build(): TaskControllerGenerator {
             val tasks = taskBuilders.map { it.build() }
-            return BindingSet(
+            return TaskControllerGenerator(
                 enclosingElement,
                 targetType,
                 enclosingElement.getBindingClassName(),
                 isFinal,
                 tasks,
-                processingEnvironment
-            )
+
+                )
         }
     }
 
@@ -142,9 +157,11 @@ class BindingSet internal constructor(
 
         const val PROP_INSTANCE = "instance"
 
-        fun newBuilder(enclosingElement: TypeElement, processingEnvironment: KotlinProcessingEnvironment): Builder {
-            val isFinal = enclosingElement.modifiers.contains(Modifier.FINAL)
-            return Builder(enclosingElement, isFinal, processingEnvironment)
+        fun builder(targetType: TargetType, processingEnvironment: KotlinProcessingEnvironment): Builder {
+            return Builder(
+                targetType,
+                processingEnvironment
+            )
         }
     }
 }

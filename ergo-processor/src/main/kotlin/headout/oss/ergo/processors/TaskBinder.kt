@@ -3,6 +3,8 @@ package headout.oss.ergo.processors
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.plusParameter
 import headout.oss.ergo.annotations.Task
+import headout.oss.ergo.codegen.api.MethodSignature
+import headout.oss.ergo.codegen.task.BindingSet
 import headout.oss.ergo.listeners.JobCallback
 import headout.oss.ergo.models.EmptyRequestData
 import headout.oss.ergo.models.JobRequest

@@ -42,6 +42,9 @@ fun TypeMirror.belongsToType(expectedType: String): Boolean {
 
 fun <T : Any> TypeMirror.belongsToType(expectedKlazz: KClass<T>) = belongsToType(expectedKlazz.qualifiedName.toString())
 
+val TypeElement.kotlinMetadata: Metadata?
+    get() = getAnnotation(Metadata::class.java)
+
 fun PropertySpec.Companion.getFromConstructor(name: String, typeName: TypeName) =
     builder(name, typeName).initializer(name).build()
 
@@ -75,6 +78,25 @@ fun KClass<*>.getExecutableElement(functionName: String, elements: Elements): Ex
 
 fun KClass<*>.getExecutableElement(function: KFunction<*>, elements: Elements): ExecutableElement? =
     getExecutableElement(function.name, elements)
+
+private val VISIBILITY_KMODIFIERS = setOf(
+    KModifier.INTERNAL,
+    KModifier.PRIVATE,
+    KModifier.PROTECTED,
+    KModifier.PUBLIC
+)
+
+private val VISIBILITY_MODIFIERS_MAP = mapOf(
+    Modifier.PRIVATE to KModifier.PRIVATE,
+    Modifier.PROTECTED to KModifier.PROTECTED,
+    Modifier.PUBLIC to KModifier.PUBLIC
+)
+
+fun Collection<KModifier>.visibility(): KModifier = find { it in VISIBILITY_KMODIFIERS } ?: KModifier.PUBLIC
+
+fun Set<Modifier>.visibility(): KModifier =
+    find { it in VISIBILITY_MODIFIERS_MAP.keys }?.let { VISIBILITY_MODIFIERS_MAP[it] } ?: KModifier.PUBLIC
+
 
 fun TypeSpec.Builder.addSuperclassConstructorParameters(vararg params: CodeBlock) = apply {
     params.forEach { addSuperclassConstructorParameter(it) }

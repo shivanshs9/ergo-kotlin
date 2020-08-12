@@ -2,7 +2,13 @@ package headout.oss.ergo.processors
 
 import com.google.auto.service.AutoService
 import com.squareup.kotlinpoet.asTypeName
+import com.squareup.kotlinpoet.classinspector.elements.ElementsClassInspector
+import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
 import headout.oss.ergo.annotations.Task
+import headout.oss.ergo.codegen.api.CachedClassInspector
+import headout.oss.ergo.codegen.api.MethodParameter
+import headout.oss.ergo.codegen.api.MethodSignature
+import headout.oss.ergo.codegen.task.BindingSet
 import me.eugeniomarletti.kotlin.processing.KotlinAbstractProcessor
 import me.eugeniomarletti.kotlin.processing.KotlinProcessingEnvironment
 import java.io.IOException
@@ -16,8 +22,15 @@ import javax.tools.Diagnostic
 /**
  * Created by shivanshs9 on 20/05/20.
  */
+@KotlinPoetMetadataPreview
 @AutoService(Processor::class)
 class TaskProcessor : KotlinAbstractProcessor() {
+    private val classInspector by lazy {
+        CachedClassInspector(
+            ElementsClassInspector.create(elementUtils, typeUtils)
+        )
+    }
+
     override fun getSupportedAnnotationTypes(): Set<String> = setOf(ANNOTATION_TYPE.canonicalName)
 
     override fun process(annotations: Set<TypeElement>, roundEnv: RoundEnvironment): Boolean {
@@ -50,6 +63,8 @@ class TaskProcessor : KotlinAbstractProcessor() {
         builderMap: MutableMap<TypeElement, BindingSet.Builder>
     ) {
         val classElement = (element.enclosingElement as TypeElement)
+        val kmClass = classInspector.toImmutableKmClass(classElement)
+        kmClass.functions.first { it.name == element.simpleName.toString() }
         val methodName = element.simpleName.toString()
         val annotation = element.getAnnotation(ANNOTATION_TYPE)
         val returnType = element.returnType

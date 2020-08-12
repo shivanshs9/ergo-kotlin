@@ -1,4 +1,4 @@
-package headout.oss.ergo.processors
+package headout.oss.ergo.codegen.api
 
 import com.squareup.kotlinpoet.TypeName
 import headout.oss.ergo.utils.belongsToType
