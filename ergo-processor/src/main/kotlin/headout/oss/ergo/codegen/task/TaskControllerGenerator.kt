@@ -4,20 +4,20 @@ import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.MemberName.Companion.member
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
+import com.squareup.kotlinpoet.metadata.specs.toTypeSpec
 import headout.oss.ergo.annotations.Task
 import headout.oss.ergo.annotations.TaskId
+import headout.oss.ergo.codegen.api.CachedClassInspector
 import headout.oss.ergo.codegen.api.TargetType
 import headout.oss.ergo.codegen.api.TypeGenerator
+import headout.oss.ergo.codegen.task.TaskMethodGenerator.Companion.PROP_INSTANCE
 import headout.oss.ergo.exceptions.ExceptionUtils
 import headout.oss.ergo.factory.BaseTaskController
 import headout.oss.ergo.factory.InstanceLocatorFactory
 import headout.oss.ergo.models.JobId
 import headout.oss.ergo.models.JobRequest
 import headout.oss.ergo.models.JobRequestData
-import headout.oss.ergo.utils.addSuperclassConstructorParameters
-import headout.oss.ergo.utils.addTypeVariables
-import headout.oss.ergo.utils.getExecutableElement
-import headout.oss.ergo.utils.superclass
+import headout.oss.ergo.utils.*
 import me.eugeniomarletti.kotlin.processing.KotlinProcessingEnvironment
 import javax.lang.model.element.ExecutableElement
 import javax.lang.model.element.TypeElement
@@ -31,7 +31,7 @@ class TaskControllerGenerator internal constructor(
     val targetType: TargetType,
     val bindingClassName: ClassName,
     val tasks: List<TaskMethodGenerator>,
-    val callTaskElement: ExecutableElement
+    val callTaskSpecBuilder: FunSpec.Builder
 ) : TypeGenerator {
     private val classTypeVariables by lazy {
         arrayOf(
@@ -88,21 +88,18 @@ class TaskControllerGenerator internal constructor(
 
     private fun createFunctions() = tasks.map { it.createFunctionSpec() }
 
-    private fun overrideCallTaskMethod(): FunSpec = FunSpec.overriding(
-        callTaskElement
-    )
+    private fun overrideCallTaskMethod(): FunSpec = callTaskSpecBuilder
+        .addModifiers(KModifier.OVERRIDE)
         .beginControlFlow("return when (taskId)")
         .apply {
             val jobRequestClass = JobRequest::class.asClassName()
             tasks.forEach {
                 addStatement(
-                    "%S -> %N(%N as %T, %N as %T)",
+                    "%S -> %N(%N as %T)",
                     it.task.taskId,
                     it.methodName,
-                    "arg0",
-                    jobRequestClass.parameterizedBy(it.requestDataClassName),
-                    "arg1",
-                    it.method.callbackType
+                    "jobRequest",
+                    jobRequestClass.parameterizedBy(it.requestDataClassName)
                 )
             }
             addStatement("else -> %M($PARAM_TASKID)", ExceptionUtils::class.member("taskNotFound"))
@@ -113,9 +110,8 @@ class TaskControllerGenerator internal constructor(
     class Builder internal constructor(
         private val targetType: TargetType,
         private val typeElement: TypeElement,
-        private val processingEnvironment: KotlinProcessingEnvironment
+        private val classInspector: CachedClassInspector
     ) {
-        //        private val targetType by lazy { sourceClass.asClassName() }
         private val taskBuilders: MutableSet<TaskMethodGenerator.Builder> = mutableSetOf()
 
         fun addMethod(task: Task, methodName: String): Boolean {
@@ -130,16 +126,16 @@ class TaskControllerGenerator internal constructor(
 
         fun build(): TaskControllerGenerator {
             val tasks = taskBuilders.map { it.build() }
-            val callTaskFunction = BaseTaskController::class.getExecutableElement(
-                "callTask",
-                processingEnvironment.elementUtils
-            )!!
+            val callTaskFunction =
+                classInspector.toTypeSpec(BaseTaskController::class).funSpecs.find { it.name == "callTask" }
+                    ?: error("No method to override with name 'callTask' in 'BaseTaskController'")
+            val callTaskBuilder = callTaskFunction.toBuilder()
             return TaskControllerGenerator(
                 typeElement,
                 targetType,
                 typeElement.getBindingClassName(),
                 tasks,
-                callTaskFunction
+                callTaskBuilder
             )
         }
     }
@@ -155,17 +151,15 @@ class TaskControllerGenerator internal constructor(
         const val ARG_JOB_REQUEST = "jobRequest"
         const val ARG_JOB_CALLBACK = "jobCallback"
 
-        const val PROP_INSTANCE = "instance"
-
         fun builder(
             targetType: TargetType,
             typeElement: TypeElement,
-            processingEnvironment: KotlinProcessingEnvironment
+            classInspector: CachedClassInspector
         ): Builder {
             return Builder(
                 targetType,
                 typeElement,
-                processingEnvironment
+                classInspector
             )
         }
     }
@@ -177,12 +171,3 @@ private fun TypeElement.getBindingClassName(): ClassName {
         .replace('.', '$') // since .simpleName is unreliable and sometimes blank
     return ClassName(packageName, "${className}_TaskBinding")
 }
-
-val TypeElement.packageElement: PackageElement
-    get() {
-        var element: Element = this
-        while (element.kind != ElementKind.PACKAGE) {
-            element = element.enclosingElement
-        }
-        return element as PackageElement
-    }

@@ -2,6 +2,8 @@ package headout.oss.ergo.codegen.api
 
 import com.squareup.kotlinpoet.AnnotationSpec
 import com.squareup.kotlinpoet.TypeName
+import headout.oss.ergo.utils.belongsToType
+import kotlin.reflect.KClass
 
 /**
  * Created by shivanshs9 on 13/08/20.
@@ -15,4 +17,6 @@ data class TargetParameter(
     val type: TypeName,
     val hasDefault: Boolean,
     val qualifiers: Set<AnnotationSpec>? = null
-)
+) {
+    fun belongsToType(clazz: KClass<*>) = type.belongsToType(clazz)
+}

@@ -45,6 +45,15 @@ fun <T : Any> TypeMirror.belongsToType(expectedKlazz: KClass<T>) = belongsToType
 val TypeElement.kotlinMetadata: Metadata?
     get() = getAnnotation(Metadata::class.java)
 
+val TypeElement.packageElement: PackageElement
+    get() {
+        var element: Element = this
+        while (element.kind != ElementKind.PACKAGE) {
+            element = element.enclosingElement
+        }
+        return element as PackageElement
+    }
+
 fun PropertySpec.Companion.getFromConstructor(name: String, typeName: TypeName) =
     builder(name, typeName).initializer(name).build()
 

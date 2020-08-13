@@ -8,6 +8,7 @@ import com.squareup.kotlinpoet.metadata.specs.toTypeSpec
 import com.squareup.kotlinpoet.metadata.toImmutableKmClass
 import headout.oss.ergo.utils.kotlinMetadata
 import javax.lang.model.element.TypeElement
+import kotlin.reflect.KClass
 
 /**
  * Created by shivanshs9 on 13/08/20.
@@ -18,23 +19,24 @@ import javax.lang.model.element.TypeElement
  * classes, common enclosing types, etc.
  */
 @KotlinPoetMetadataPreview
-internal class CachedClassInspector(private val classInspector: ClassInspector) {
-    private val elementToSpecCache = mutableMapOf<TypeElement, TypeSpec>()
+class CachedClassInspector(private val classInspector: ClassInspector) {
+    private val classToSpecCache = mutableMapOf<KClass<*>, TypeSpec>()
     private val kmClassToSpecCache = mutableMapOf<ImmutableKmClass, TypeSpec>()
     private val metadataToKmClassCache = mutableMapOf<Metadata, ImmutableKmClass>()
 
-    fun toImmutableKmClass(metadata: Metadata): ImmutableKmClass {
-        return metadataToKmClassCache.getOrPut(metadata) {
-            metadata.toImmutableKmClass()
-        }
+    fun toImmutableKmClass(metadata: Metadata): ImmutableKmClass = metadataToKmClassCache.getOrPut(metadata) {
+        metadata.toImmutableKmClass()
     }
 
-    fun toImmutableKmClass(element: TypeElement): ImmutableKmClass? =
-        element.kotlinMetadata?.let { toImmutableKmClass(it) }
+    fun toImmutableKmClass(element: TypeElement): ImmutableKmClass? = element.kotlinMetadata?.let {
+        toImmutableKmClass(it)
+    }
 
-    fun toTypeSpec(kmClass: ImmutableKmClass): TypeSpec {
-        return kmClassToSpecCache.getOrPut(kmClass) {
-            kmClass.toTypeSpec(classInspector)
-        }
+    fun toTypeSpec(kmClass: ImmutableKmClass): TypeSpec = kmClassToSpecCache.getOrPut(kmClass) {
+        kmClass.toTypeSpec(classInspector)
+    }
+
+    fun toTypeSpec(clazz: KClass<*>): TypeSpec = classToSpecCache.getOrPut(clazz) {
+        clazz.toTypeSpec(classInspector)
     }
 }

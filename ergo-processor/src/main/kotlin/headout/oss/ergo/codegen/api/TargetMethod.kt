@@ -2,6 +2,8 @@ package headout.oss.ergo.codegen.api
 
 import com.squareup.kotlinpoet.KModifier
 import com.squareup.kotlinpoet.TypeName
+import headout.oss.ergo.models.JobRequest
+import headout.oss.ergo.models.JobResult
 
 /**
  * Created by shivanshs9 on 13/08/20.
@@ -14,4 +16,8 @@ data class TargetMethod(
     val returnType: TypeName,
     val parameters: List<TargetParameter>,
     val modifiers: Collection<KModifier>
-)
+) {
+    val targetParameters by lazy {
+        parameters.filter { !it.belongsToType(JobRequest::class) && !it.belongsToType(JobResult::class) }
+    }
+}

@@ -25,22 +25,12 @@ abstract class BaseTaskController<Req : JobRequestData, Res>(
 
     override suspend fun execute(): JobResult<Res> {
         val jobRequest = handleAndWrapError(ExceptionUtils::processLibraryError) { JobRequest(jobId, requestData) }
-        return suspendCoroutine { continuation ->
-            val callback = object : JobCallback<Res> {
-                override fun success(result: Res) {
-                    continuation.resume(processSuccess(result))
-                }
-
-                override fun error(error: Throwable) {
-                    continuation.resumeWithException(ExceptionUtils.processClientError(error))
-                }
-            }
-            callTask(jobRequest, callback)
+        return kotlin.runCatching {
+            return@runCatching callTask(jobRequest)
         }
+            .getOrElse { throw ExceptionUtils.processClientError(it) }
+            .let { processSuccess(it) }
     }
 
-    abstract fun callTask(
-        jobRequest: JobRequest<Req>,
-        jobCallback: JobCallback<Res>
-    )
+    abstract suspend fun callTask(jobRequest: JobRequest<Req>): Res
 }

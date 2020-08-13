@@ -2,6 +2,7 @@ package headout.oss.ergo.codegen
 
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
+import com.squareup.kotlinpoet.metadata.isSuspend
 import com.squareup.kotlinpoet.metadata.specs.internal.ClassInspectorUtil
 import headout.oss.ergo.codegen.api.CachedClassInspector
 import headout.oss.ergo.codegen.api.TargetMethod

@@ -5,6 +5,7 @@ import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.plusParameter
 import headout.oss.ergo.annotations.Task
 import headout.oss.ergo.codegen.api.MethodSignature
 import headout.oss.ergo.codegen.api.TargetMethod
+import headout.oss.ergo.codegen.api.TargetParameter
 import headout.oss.ergo.listeners.JobCallback
 import headout.oss.ergo.models.EmptyRequestData
 import headout.oss.ergo.models.JobRequest
@@ -28,25 +29,17 @@ class TaskMethodGenerator internal constructor(
 
     fun createFunctionSpec(): FunSpec =
         FunSpec.builder(methodName)
+            .addModifiers(KModifier.SUSPEND)
             .addParameter(PARAM_NAME_REQUEST, getRequestType(requestDataClassName))
-            .addParameter(PARAM_NAME_CALLBACK, method.callbackType)
             .apply {
-                val targetArgs = method.getTargetArguments("$PARAM_NAME_REQUEST.requestData.") {
+                val targetArgs = targetMethod.getTargetArguments("$PARAM_NAME_REQUEST.requestData.") {
                     when {
-                        it.isSubtypeOf(JobRequest::class) -> PARAM_NAME_REQUEST
-                        it.isSubtypeOf(JobCallback::class) -> PARAM_NAME_CALLBACK
-                        else -> error("No arg found for '${it.name}' (${it.typeName}) in '${method.name}' method")
+                        it.belongsToType(JobRequest::class) -> PARAM_NAME_REQUEST
+                        else -> error("No arg found for '${it.name}' (${it.type}) in '${targetMethod.name}' method")
                     }
                 }
-                val isRunCatchNeeded = method.callbackParameter == null
-                if (isRunCatchNeeded) beginControlFlow("runCatching<%T>", method.returnType)
-                val methodReceiver = if (method.isStatic) targetClassName.simpleName else TaskControllerGenerator.PROP_INSTANCE
-                addStatement("%L.%L(${targetArgs.joinToString(", ")})", methodReceiver, method.name)
-                if (isRunCatchNeeded) {
-                    endControlFlow()
-                    addStatement(".onSuccess($PARAM_NAME_CALLBACK::success)")
-                    addStatement(".onFailure($PARAM_NAME_CALLBACK::error)")
-                }
+                val methodReceiver = PROP_INSTANCE
+                addStatement("%L.%L(${targetArgs.joinToString(", ")})", methodReceiver, targetMethod.name)
             }
             .build()
 
@@ -56,15 +49,15 @@ class TaskMethodGenerator internal constructor(
         .addModifiers(KModifier.DATA)
         .primaryConstructor(
             FunSpec.constructorBuilder()
-                .addParameters(method.targetParameters.map { ParameterSpec.builder(it.name, it.typeName).build() })
+                .addParameters(targetMethod.targetParameters.map { ParameterSpec.builder(it.name, it.type).build() })
                 .build()
         )
-        .addProperties(method.targetParameters.map {
-            PropertySpec.getFromConstructor(it.name, it.typeName)
+        .addProperties(targetMethod.targetParameters.map {
+            PropertySpec.getFromConstructor(it.name, it.type)
         })
         .build()
 
-    fun isRequestDataNeeded() = method.targetParameters.isNotEmpty()
+    fun isRequestDataNeeded() = targetMethod.targetParameters.isNotEmpty()
 
     private fun getRequestType(type: TypeName): TypeName = JobRequest::class.asTypeName().plusParameter(type)
 
@@ -81,13 +74,24 @@ class TaskMethodGenerator internal constructor(
 
     companion object {
         const val PREFIX_CLASS_REQUEST_DATA = "RequestData_"
-        const val PARAM_NAME_CALLBACK = "jobCallback"
         const val PARAM_NAME_REQUEST = "jobRequest"
 
-        fun builder(task: Task, targetMethod: TargetMethod, enclosingClass: ClassName) = Builder(task, targetMethod, enclosingClass)
+        const val PROP_INSTANCE = "instance"
+
+        fun builder(task: Task, targetMethod: TargetMethod, enclosingClass: ClassName) =
+            Builder(task, targetMethod, enclosingClass)
 
         fun getTargetMethodName(taskId: String): String {
             return taskId.replace("[.$^#%/:\\-]".toRegex(), "_")
         }
     }
 }
+
+fun TargetMethod.getTargetArguments(
+    prefixTargetArg: String,
+    transformer: (TargetParameter) -> String
+): Iterable<String> =
+    parameters.map {
+        if (targetParameters.contains(it)) "${prefixTargetArg}${it.name}"
+        else transformer(it)
+    }
