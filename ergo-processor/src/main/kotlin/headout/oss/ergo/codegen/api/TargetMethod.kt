@@ -9,7 +9,7 @@ import com.squareup.kotlinpoet.TypeName
 /**
  * A method in user class
  */
-internal data class TargetMethod(
+data class TargetMethod(
     val name: String,
     val returnType: TypeName,
     val parameters: List<TargetParameter>,

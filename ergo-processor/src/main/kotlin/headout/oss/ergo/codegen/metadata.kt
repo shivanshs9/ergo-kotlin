@@ -8,7 +8,7 @@ import headout.oss.ergo.codegen.api.TargetMethod
 import headout.oss.ergo.codegen.api.TargetParameter
 import headout.oss.ergo.codegen.api.TargetType
 import headout.oss.ergo.utils.visibility
-import me.eugeniomarletti.kotlin.processing.KotlinAbstractProcessor
+import me.eugeniomarletti.kotlin.processing.KotlinProcessingEnvironment
 import javax.lang.model.element.ElementKind
 import javax.lang.model.element.ExecutableElement
 import javax.lang.model.element.TypeElement
@@ -16,7 +16,7 @@ import javax.lang.model.element.TypeElement
 /**
  * Created by shivanshs9 on 13/08/20.
  */
-private fun KotlinAbstractProcessor.javaTargetType(
+private fun KotlinProcessingEnvironment.javaTargetType(
     element: TypeElement
 ): TargetType {
     val methods = elementUtils.getAllMembers(element)
@@ -34,17 +34,17 @@ private fun KotlinAbstractProcessor.javaTargetType(
             )
         }.associateBy { it.name }
     return TargetType(
-        typeName = element.asClassName(),
+        className = element.asClassName(),
         methods = methods,
         visibility = element.modifiers.visibility()
     )
 }
 
 @KotlinPoetMetadataPreview
-internal fun KotlinAbstractProcessor.targetType(
+internal fun KotlinProcessingEnvironment.targetType(
     element: TypeElement,
     classInspector: CachedClassInspector
-): TargetType? {
+): TargetType {
     return classInspector.toImmutableKmClass(element)?.let { kmClass ->
         val kotlinApi = classInspector.toTypeSpec(kmClass)
         val methods = kotlinApi.funSpecs.map { funSpec ->
@@ -56,7 +56,7 @@ internal fun KotlinAbstractProcessor.targetType(
             )
         }.associateBy { it.name }
         return TargetType(
-            typeName = ClassInspectorUtil.createClassName(kmClass.name),
+            className = ClassInspectorUtil.createClassName(kmClass.name),
             methods = methods,
             visibility = kotlinApi.modifiers.visibility()
         )

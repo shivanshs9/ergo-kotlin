@@ -1,10 +1,10 @@
-package headout.oss.ergo.processors
+package headout.oss.ergo.codegen.task
 
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.plusParameter
 import headout.oss.ergo.annotations.Task
 import headout.oss.ergo.codegen.api.MethodSignature
-import headout.oss.ergo.codegen.task.BindingSet
+import headout.oss.ergo.codegen.api.TargetMethod
 import headout.oss.ergo.listeners.JobCallback
 import headout.oss.ergo.models.EmptyRequestData
 import headout.oss.ergo.models.JobRequest
@@ -15,10 +15,10 @@ import kotlinx.serialization.Serializable
 /**
  * Created by shivanshs9 on 20/05/20.
  */
-class TaskBinder internal constructor(
+class TaskMethodGenerator internal constructor(
     val methodName: String,
     val task: Task,
-    val method: MethodSignature,
+    val targetMethod: TargetMethod,
     private val targetClassName: ClassName
 ) {
     val requestDataClassName by lazy {
@@ -31,7 +31,7 @@ class TaskBinder internal constructor(
             .addParameter(PARAM_NAME_REQUEST, getRequestType(requestDataClassName))
             .addParameter(PARAM_NAME_CALLBACK, method.callbackType)
             .apply {
-                val targetArgs = method.getTargetArguments("${PARAM_NAME_REQUEST}.requestData.") {
+                val targetArgs = method.getTargetArguments("$PARAM_NAME_REQUEST.requestData.") {
                     when {
                         it.isSubtypeOf(JobRequest::class) -> PARAM_NAME_REQUEST
                         it.isSubtypeOf(JobCallback::class) -> PARAM_NAME_CALLBACK
@@ -40,7 +40,7 @@ class TaskBinder internal constructor(
                 }
                 val isRunCatchNeeded = method.callbackParameter == null
                 if (isRunCatchNeeded) beginControlFlow("runCatching<%T>", method.returnType)
-                val methodReceiver = if (method.isStatic) targetClassName.simpleName else BindingSet.PROP_INSTANCE
+                val methodReceiver = if (method.isStatic) targetClassName.simpleName else TaskControllerGenerator.PROP_INSTANCE
                 addStatement("%L.%L(${targetArgs.joinToString(", ")})", methodReceiver, method.name)
                 if (isRunCatchNeeded) {
                     endControlFlow()
@@ -68,13 +68,14 @@ class TaskBinder internal constructor(
 
     private fun getRequestType(type: TypeName): TypeName = JobRequest::class.asTypeName().plusParameter(type)
 
-    class Builder internal constructor(val task: Task, val targetClassName: ClassName) {
-        var methodSignature: MethodSignature? = null
-
-        fun build(): TaskBinder = methodSignature.let { signature ->
-            if (signature == null) throw IllegalStateException("Method signature not provided with the task")
+    class Builder internal constructor(
+        private val task: Task,
+        private val targetMethod: TargetMethod,
+        private val enclosingClass: ClassName
+    ) {
+        fun build(): TaskMethodGenerator {
             val methodName = getTargetMethodName(task.taskId)
-            TaskBinder(methodName, task, signature, targetClassName)
+            return TaskMethodGenerator(methodName, task, targetMethod, enclosingClass)
         }
     }
 
@@ -83,7 +84,7 @@ class TaskBinder internal constructor(
         const val PARAM_NAME_CALLBACK = "jobCallback"
         const val PARAM_NAME_REQUEST = "jobRequest"
 
-        fun newBuilder(task: Task, className: ClassName) = Builder(task, className)
+        fun builder(task: Task, targetMethod: TargetMethod, enclosingClass: ClassName) = Builder(task, targetMethod, enclosingClass)
 
         fun getTargetMethodName(taskId: String): String {
             return taskId.replace("[.$^#%/:\\-]".toRegex(), "_")

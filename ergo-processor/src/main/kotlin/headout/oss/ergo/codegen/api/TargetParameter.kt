@@ -9,7 +9,7 @@ import com.squareup.kotlinpoet.TypeName
 /**
  * A parameter in user code that should be populated by generated code.
  * */
-internal data class TargetParameter(
+data class TargetParameter(
     val name: String,
     val index: Int,
     val type: TypeName,

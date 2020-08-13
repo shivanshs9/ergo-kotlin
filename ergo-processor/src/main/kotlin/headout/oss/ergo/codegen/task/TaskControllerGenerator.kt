@@ -6,7 +6,6 @@ import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
 import headout.oss.ergo.annotations.Task
 import headout.oss.ergo.annotations.TaskId
-import headout.oss.ergo.codegen.api.MethodSignature
 import headout.oss.ergo.codegen.api.TargetType
 import headout.oss.ergo.codegen.api.TypeGenerator
 import headout.oss.ergo.exceptions.ExceptionUtils
@@ -15,12 +14,13 @@ import headout.oss.ergo.factory.InstanceLocatorFactory
 import headout.oss.ergo.models.JobId
 import headout.oss.ergo.models.JobRequest
 import headout.oss.ergo.models.JobRequestData
-import headout.oss.ergo.processors.TaskBinder
 import headout.oss.ergo.utils.addSuperclassConstructorParameters
 import headout.oss.ergo.utils.addTypeVariables
 import headout.oss.ergo.utils.getExecutableElement
 import headout.oss.ergo.utils.superclass
 import me.eugeniomarletti.kotlin.processing.KotlinProcessingEnvironment
+import javax.lang.model.element.ExecutableElement
+import javax.lang.model.element.TypeElement
 
 /**
  * Created by shivanshs9 on 20/05/20.
@@ -28,11 +28,10 @@ import me.eugeniomarletti.kotlin.processing.KotlinProcessingEnvironment
 @KotlinPoetMetadataPreview
 class TaskControllerGenerator internal constructor(
     val enclosingElement: TypeElement,
-    val targetType: TypeName,
+    val targetType: TargetType,
     val bindingClassName: ClassName,
-    val isFinal: Boolean,
-    val tasks: List<TaskBinder>,
-    private val processingEnvironment: KotlinProcessingEnvironment
+    val tasks: List<TaskMethodGenerator>,
+    val callTaskElement: ExecutableElement
 ) : TypeGenerator {
     private val classTypeVariables by lazy {
         arrayOf(
@@ -41,10 +40,11 @@ class TaskControllerGenerator internal constructor(
         )
     }
 
-    override fun brewKotlin(): FileSpec = createType().let { type ->
-        FileSpec.builder(bindingClassName.packageName, type.name!!)
-            .addType(type)
+    override fun brewKotlin(brewHook: (FileSpec.Builder) -> Unit): FileSpec = createType().let { bindingType ->
+        FileSpec.builder(bindingClassName.packageName, bindingType.name!!)
+            .addType(bindingType)
             .apply {
+                brewHook(this)
                 tasks.forEach {
                     if (it.isRequestDataNeeded()) addType(it.createRequestDataSpec())
                 }
@@ -57,7 +57,7 @@ class TaskControllerGenerator internal constructor(
         .addModifiers(KModifier.PUBLIC)
         .addOriginatingElement(enclosingElement)
         .apply {
-            val instanceProp = PropertySpec.builder(PROP_INSTANCE, targetType, KModifier.PRIVATE)
+            val instanceProp = PropertySpec.builder(PROP_INSTANCE, targetType.className, KModifier.PRIVATE)
                 .initializer(
                     "%M(%L)",
                     InstanceLocatorFactory::class.member("getInstance"),
@@ -81,7 +81,6 @@ class TaskControllerGenerator internal constructor(
             PARAM_REQUESTDATA
         )
         .apply {
-            if (isFinal) addModifiers(KModifier.FINAL)
             addFunctions(createFunctions())
         }
         .addFunction(overrideCallTaskMethod())
@@ -90,10 +89,7 @@ class TaskControllerGenerator internal constructor(
     private fun createFunctions() = tasks.map { it.createFunctionSpec() }
 
     private fun overrideCallTaskMethod(): FunSpec = FunSpec.overriding(
-        BaseTaskController::class.getExecutableElement(
-            "callTask",
-            processingEnvironment.elementUtils
-        )!!
+        callTaskElement
     )
         .beginControlFlow("return when (taskId)")
         .apply {
@@ -116,31 +112,35 @@ class TaskControllerGenerator internal constructor(
 
     class Builder internal constructor(
         private val targetType: TargetType,
+        private val typeElement: TypeElement,
         private val processingEnvironment: KotlinProcessingEnvironment
     ) {
         //        private val targetType by lazy { sourceClass.asClassName() }
-        private val taskBuilders: MutableSet<TaskBinder.Builder> = mutableSetOf()
+        private val taskBuilders: MutableSet<TaskMethodGenerator.Builder> = mutableSetOf()
 
-        fun addMethod(task: Task, methodSignature: MethodSignature): Boolean {
-            val taskBuilder = TaskBinder.newBuilder(
+        fun addMethod(task: Task, methodName: String): Boolean {
+            val method = targetType.methods[methodName] ?: return false
+            TaskMethodGenerator.builder(
                 task,
-                targetType
-            ).apply {
-                this.methodSignature = methodSignature
-            }.also { taskBuilders.add(it) }
+                method,
+                targetType.className
+            ).also { taskBuilders.add(it) }
             return true
         }
 
         fun build(): TaskControllerGenerator {
             val tasks = taskBuilders.map { it.build() }
+            val callTaskFunction = BaseTaskController::class.getExecutableElement(
+                "callTask",
+                processingEnvironment.elementUtils
+            )!!
             return TaskControllerGenerator(
-                enclosingElement,
+                typeElement,
                 targetType,
-                enclosingElement.getBindingClassName(),
-                isFinal,
+                typeElement.getBindingClassName(),
                 tasks,
-
-                )
+                callTaskFunction
+            )
         }
     }
 
@@ -157,9 +157,14 @@ class TaskControllerGenerator internal constructor(
 
         const val PROP_INSTANCE = "instance"
 
-        fun builder(targetType: TargetType, processingEnvironment: KotlinProcessingEnvironment): Builder {
+        fun builder(
+            targetType: TargetType,
+            typeElement: TypeElement,
+            processingEnvironment: KotlinProcessingEnvironment
+        ): Builder {
             return Builder(
                 targetType,
+                typeElement,
                 processingEnvironment
             )
         }
