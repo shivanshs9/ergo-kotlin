@@ -18,6 +18,7 @@ import software.amazon.awssdk.services.sqs.SqsAsyncClient
 import software.amazon.awssdk.services.sqs.model.*
 import java.util.concurrent.TimeUnit
 import kotlin.math.round
+import kotlin.properties.Delegates
 
 /**
  * Created by shivanshs9 on 28/05/20.
@@ -29,10 +30,12 @@ class SqsMsgService(
     private val sqs: SqsAsyncClient,
     private val requestQueueUrl: String,
     private val resultQueueUrl: String = requestQueueUrl,
-    private val defaultVisibilityTimeout: Long = DEFAULT_VISIBILITY_TIMEOUT,
+    private val defaultVisibilityTimeout: Long? = null,
     scope: CoroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 ) : BaseMsgService<Message>(scope) {
-    private val defaultPingMessageDelay: Long by lazy { getPingDelay(defaultVisibilityTimeout) }
+    private var visibilityTimeout by Delegates.notNull<Long>()
+
+    private val defaultPingMessageDelay: Long by lazy { getPingDelay(visibilityTimeout) }
     private val pendingJobs = mutableSetOf<JobId>()
 
     private val timeoutResultCollect = ticker(TIMEOUT_RESULT_COLLECTION)
@@ -44,6 +47,22 @@ class SqsMsgService(
             .maxNumberOfMessages(MAX_BUFFERED_MESSAGES)
             .waitTimeSeconds(20)
             .build()
+    }
+
+    override suspend fun initService() {
+        visibilityTimeout = defaultVisibilityTimeout?.also {
+            logger.info { "Using the visibility timeout of $it seconds" }
+        } ?: sqs.runCatching {
+            logger.info { "Attempting to fetch visibility timeout..." }
+            getVisibilityTimeout(requestQueueUrl).also {
+                logger.info { "Fetched visibility timeout of $it seconds" }
+            }
+        }.getOrElse {
+            logger.warn(it) { "Failed to fetch!!" }
+            DEFAULT_VISIBILITY_TIMEOUT.also {
+                logger.info { "Using default visibility timeout of $it seconds" }
+            }
+        }
     }
 
     override suspend fun processRequest(request: RequestMsg<Message>): JobResult<*> = try {
@@ -90,8 +109,8 @@ class SqsMsgService(
                         is PingMessageCapture -> if (pendingJobs.contains(capture.request.jobId)) {
                             logger.debug(MARKER_RESULT_BUFFER) { "PING: job '${capture.request.jobId}' still pending (attempt ${capture.attempt})" }
                             val newTimeout =
-                                getVisibilityTimeoutForAttempt(defaultVisibilityTimeout, capture.attempt + 1)
-                            changeVisibilityTimeout(capture.request, newTimeout.toInt())
+                                getVisibilityTimeoutForAttempt(visibilityTimeout, capture.attempt)
+                            changeVisibilityTimeout(capture.request, newTimeout)
                             sendDelayed(
                                 captures,
                                 PingMessageCapture(capture.request, capture.attempt + 1),
@@ -145,13 +164,13 @@ class SqsMsgService(
         }
     }
 
-    private suspend fun changeVisibilityTimeout(request: RequestMsg<Message>, visibilityTimeout: Int) =
+    private suspend fun changeVisibilityTimeout(request: RequestMsg<Message>, visibilityTimeout: Long) =
         launch(Dispatchers.IO) {
-            logger.info { "Change visibility timeout of message with jobId '${request.jobId}' to $visibilityTimeout" }
+            logger.info { "Change visibility timeout of message with jobId '${request.jobId}' to $visibilityTimeout seconds" }
             sqs.changeMessageVisibility {
                 it.queueUrl(requestQueueUrl)
                 it.receiptHandle(request.message.receiptHandle())
-                it.visibilityTimeout(visibilityTimeout)
+                it.visibilityTimeout(visibilityTimeout.toInt())
             }.await()
         }
 
@@ -166,7 +185,7 @@ class SqsMsgService(
     companion object : TaskServiceConversion {
         const val MAX_BUFFERED_MESSAGES = 10
         private const val MAX_VISIBILITY_TIMEOUT = 43199.toLong()
-        val DEFAULT_VISIBILITY_TIMEOUT = TimeUnit.MINUTES.toSeconds(20)
+        val DEFAULT_VISIBILITY_TIMEOUT = TimeUnit.SECONDS.toSeconds(30)
         val TIMEOUT_RESULT_COLLECTION: Long = TimeUnit.MINUTES.toMillis(2)
 
         private val MARKER_RESULT_BUFFER = MarkerFactory.getMarker("Buffer")
