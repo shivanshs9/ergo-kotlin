@@ -2,12 +2,17 @@ package headout.oss.ergo.services
 
 import com.google.common.truth.Truth.assertThat
 import headout.oss.ergo.BaseTest
+import headout.oss.ergo.examples.WhyDisKolaveriDi
+import headout.oss.ergo.factory.JsonFactory
 import headout.oss.ergo.models.JobResult
 import headout.oss.ergo.models.JobResultMetadata
 import io.mockk.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.serialization.ImplicitReflectionSerializer
+import kotlinx.serialization.stringify
+import mu.KotlinLogging
 import org.junit.Test
 import software.amazon.awssdk.services.sqs.SqsAsyncClient
 import software.amazon.awssdk.services.sqs.model.*
@@ -17,6 +22,8 @@ import java.util.function.Consumer
 /**
  * Created by shivanshs9 on 02/06/20.
  */
+private val logger = KotlinLogging.logger {}
+
 @ExperimentalCoroutinesApi
 class SqsMsgServiceTest : BaseTest() {
     private val sqsClient: SqsAsyncClient = mockk(relaxed = true)
@@ -140,6 +147,47 @@ class SqsMsgServiceTest : BaseTest() {
             msgService["handleSuccess"](match<SuccessResultCapture<Message>> {
                 val metadata = it.result.metadata
                 metadata.status == JobResultMetadata.STATUS.SUCCESS.code
+            })
+        }
+    }
+
+    @ImplicitReflectionSerializer
+    @Test
+    fun whenTaskRequestValidAndSuspendingTaskAndRanSuccessfully_VerifySuccessResult() {
+        val taskId = "suspend.2"
+        val body = JsonFactory.json.stringify(mapOf("request" to WhyDisKolaveriDi(3)))
+        mockReceiveMessageResponse(taskId = taskId, body = body)
+        msgService.start()
+        coVerify {
+            msgService.processRequest(any())
+            delay(DELAY_WAIT + 2000)
+        }
+        verify {
+            msgService["handleSuccess"](match<SuccessResultCapture<Message>> {
+                logger.info("result=${it.result}")
+                val metadata = it.result.metadata
+                metadata.status == JobResultMetadata.STATUS.SUCCESS.code
+            })
+        }
+    }
+
+    @ImplicitReflectionSerializer
+    @Test
+    fun whenTaskRequestValidAndSuspendingTaskButJobTerminated_VerifyErrorResult() {
+        val taskId = "suspend.2"
+        val body = JsonFactory.json.stringify(mapOf("request" to WhyDisKolaveriDi(3)))
+        mockReceiveMessageResponse(taskId = taskId, body = body)
+        msgService.start()
+        coVerify {
+            msgService.processRequest(any())
+            delay(DELAY_WAIT)
+        }
+        msgService.stop()
+        verify {
+            msgService["handleError"](match<ErrorResultCapture<Message>> {
+                logger.info("result=${it.result}")
+                val metadata = it.result.metadata
+                metadata.status == JobResultMetadata.STATUS.ERROR_LIBRARY_JOB_CANCELLED.code
             })
         }
     }
