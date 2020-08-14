@@ -167,6 +167,27 @@ class KotlinTaskTest {
         assertResult(result)
     }
 
+    // Default Value is not yet supported in kotlinpoet so the
+    // generated request data class is actually invalid
+    @Test
+    fun oneArgWithDefaultValue() {
+        val source = """
+            package example.tasks
+            
+            import headout.oss.ergo.annotations.Task
+            
+            class ExampleTask {
+                @Task(taskId="oneArgWithDefaultValue")
+                fun oneArgWithDefaultValue(num: Int = 134) {
+                    println("doing some work x $\num...")
+                }
+            }
+        """.trimIndent()
+
+        val result = compile(source)
+        assertResult(result)
+    }
+
     private fun assertResult(result: KotlinCompilation.Result, exitCode: ExitCode = ExitCode.OK) {
         result.sourcesGeneratedByAnnotationProcessor.forEach {
             println(it.canonicalPath)
