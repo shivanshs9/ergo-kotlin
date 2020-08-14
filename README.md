@@ -180,21 +180,17 @@ data class Request(val somethingImportant: Int)
 data class Result(val number: Int)
 ```
 
-- To write a function supporting callback:
+- It even supports suspending functions too! Here's an example:
 
 ```kotlin
 import headout.oss.ergo.annotations.Task
-import headout.oss.ergo.listeners.JobCallback
+import kotlinx.coroutines.delay
 
 class ExampleTasks {
-    @Task("callbackTask")
-    fun callbackTask(input: Int, callback: JobCallback<Int>): Unit {
-      runCatching<Unit> {
-        val result: Int = input
-        callback.success(result)
-      }.onFailure {
-        callback.error(it)
-      }
+    @Task("suspendingTask")
+    suspend fun longRunningTask(input: Int): Int {
+      delay(2000L)
+      return input * input
     }
 }
 ```
@@ -244,18 +240,15 @@ Runtime.getRuntime().addShutdownHook(object : Thread() {
 
 #### Terminology
 
-- Task => used to denote a executable function with given input and given output
+- Task => used to denote an executable function with given input and given output
   - Has TaskId to uniquely differentiate tasks
   - Can be used to refer to both regular and suspending functions
   - Function Parameters must be serializable (using @Serializable on the data class)
-  - It can either by synchronous or callback function:
-    - By default, it is a synchronous function with given return type as the job result type
-    - If the function has a parameter of subtype of `JobCallback<T>`, then the job result type is T and the return value of function is ignored.
+  - The task function can either be regular or suspending function, and its return type is the job result type too (which must again be serializable)
 - TaskId => name to map to a particular function (must be unique in project).
   - For SQS FIFO queues, it is analogous to **MessageGroupId**
   - For Pulsar, it is analogous to **Topic**
 - JobId => uniquely generated from the sender side to denote a particular running instance of a task.
-
   - For SQS queues, it is analogous to **MessageId**
 
 #### Message Schema
