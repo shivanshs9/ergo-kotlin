@@ -7,6 +7,7 @@ import headout.oss.ergo.annotations.Task
 import headout.oss.ergo.codegen.api.CachedClassInspector
 import headout.oss.ergo.codegen.targetType
 import headout.oss.ergo.codegen.task.TaskControllerGenerator
+import headout.oss.ergo.factory.IJobParser
 import me.eugeniomarletti.kotlin.processing.KotlinAbstractProcessor
 import java.io.IOException
 import javax.annotation.processing.FilerException
@@ -22,7 +23,7 @@ import javax.tools.Diagnostic
 /**
  * Created by shivanshs9 on 20/05/20.
  */
-@KotlinPoetMetadataPreview
+@OptIn(KotlinPoetMetadataPreview::class)
 @AutoService(Processor::class)
 class TaskProcessor : KotlinAbstractProcessor() {
     internal val classInspector by lazy {
@@ -41,7 +42,8 @@ class TaskProcessor : KotlinAbstractProcessor() {
             }.onFailure { handleBrewError(it, binding.key) }
         }
         kotlin.runCatching {
-            val jobParserBinder = JobParserBinder(bindingMap, this)
+            val jobParserApi = classInspector.toTypeSpec(IJobParser::class)
+            val jobParserBinder = JobParserBinder(bindingMap, jobParserApi, this)
             jobParserBinder.brewKotlin().writeTo(filer)
         }.onFailure { if (it !is FilerException) error(it) }
         return false
@@ -119,5 +121,5 @@ private fun MutableMap<TypeElement, TaskControllerGenerator.Builder>.attachEleme
 ) =
     getOrPut(enclosingElement) {
         val targetType = taskProcessor.targetType(enclosingElement, taskProcessor.classInspector)
-        TaskControllerGenerator.builder(targetType, taskProcessor)
+        TaskControllerGenerator.builder(targetType, enclosingElement, taskProcessor.classInspector)
     }

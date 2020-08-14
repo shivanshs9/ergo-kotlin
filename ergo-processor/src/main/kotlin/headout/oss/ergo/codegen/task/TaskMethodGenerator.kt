@@ -3,10 +3,8 @@ package headout.oss.ergo.codegen.task
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.plusParameter
 import headout.oss.ergo.annotations.Task
-import headout.oss.ergo.codegen.api.MethodSignature
 import headout.oss.ergo.codegen.api.TargetMethod
 import headout.oss.ergo.codegen.api.TargetParameter
-import headout.oss.ergo.listeners.JobCallback
 import headout.oss.ergo.models.EmptyRequestData
 import headout.oss.ergo.models.JobRequest
 import headout.oss.ergo.models.JobRequestData
@@ -27,19 +25,20 @@ class TaskMethodGenerator internal constructor(
         else EmptyRequestData::class.asClassName()
     }
 
-    fun createFunctionSpec(): FunSpec =
+    fun createFunctionSpec(genHook: (FunSpec.Builder) -> Unit = { }): FunSpec =
         FunSpec.builder(methodName)
             .addModifiers(KModifier.SUSPEND)
             .addParameter(PARAM_NAME_REQUEST, getRequestType(requestDataClassName))
             .apply {
+                genHook(this)
                 val targetArgs = targetMethod.getTargetArguments("$PARAM_NAME_REQUEST.requestData.") {
                     when {
                         it.belongsToType(JobRequest::class) -> PARAM_NAME_REQUEST
                         else -> error("No arg found for '${it.name}' (${it.type}) in '${targetMethod.name}' method")
                     }
                 }
-                val methodReceiver = PROP_INSTANCE
-                addStatement("%L.%L(${targetArgs.joinToString(", ")})", methodReceiver, targetMethod.name)
+                val methodReceiver = TaskControllerGenerator.PROP_INSTANCE
+                addStatement("return %L.%L(${targetArgs.joinToString(", ")}) as Res", methodReceiver, targetMethod.name)
             }
             .build()
 
@@ -49,7 +48,13 @@ class TaskMethodGenerator internal constructor(
         .addModifiers(KModifier.DATA)
         .primaryConstructor(
             FunSpec.constructorBuilder()
-                .addParameters(targetMethod.targetParameters.map { ParameterSpec.builder(it.name, it.type).build() })
+                .addParameters(targetMethod.targetParameters.map {
+                    ParameterSpec.builder(it.name, it.type)
+                        .apply {
+                            it.defaultValue?.let { code -> defaultValue(code) }
+                        }
+                        .build()
+                })
                 .build()
         )
         .addProperties(targetMethod.targetParameters.map {
@@ -75,8 +80,6 @@ class TaskMethodGenerator internal constructor(
     companion object {
         const val PREFIX_CLASS_REQUEST_DATA = "RequestData_"
         const val PARAM_NAME_REQUEST = "jobRequest"
-
-        const val PROP_INSTANCE = "instance"
 
         fun builder(task: Task, targetMethod: TargetMethod, enclosingClass: ClassName) =
             Builder(task, targetMethod, enclosingClass)

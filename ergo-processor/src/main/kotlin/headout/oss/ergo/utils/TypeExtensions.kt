@@ -106,6 +106,14 @@ fun Collection<KModifier>.visibility(): KModifier = find { it in VISIBILITY_KMOD
 fun Set<Modifier>.visibility(): KModifier =
     find { it in VISIBILITY_MODIFIERS_MAP.keys }?.let { VISIBILITY_MODIFIERS_MAP[it] } ?: KModifier.PUBLIC
 
+fun Collection<FunSpec>.withName(name: String): FunSpec =
+    find { it.name == name } ?: error("No method found with name '$name'")
+
+fun TypeSpec.overrideFunction(name: String): FunSpec.Builder = funSpecs.withName(name).toBuilder()
+    .addModifiers(KModifier.OVERRIDE)
+    .apply {
+        modifiers.remove(KModifier.ABSTRACT)
+    }
 
 fun TypeSpec.Builder.addSuperclassConstructorParameters(vararg params: CodeBlock) = apply {
     params.forEach { addSuperclassConstructorParameter(it) }

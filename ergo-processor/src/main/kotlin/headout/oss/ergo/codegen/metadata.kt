@@ -2,7 +2,6 @@ package headout.oss.ergo.codegen
 
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
-import com.squareup.kotlinpoet.metadata.isSuspend
 import com.squareup.kotlinpoet.metadata.specs.internal.ClassInspectorUtil
 import headout.oss.ergo.codegen.api.CachedClassInspector
 import headout.oss.ergo.codegen.api.TargetMethod
@@ -69,6 +68,6 @@ private fun Collection<ParameterSpec>.toTargetParameters() = mapIndexed { index,
         name = parameterSpec.name,
         index = index,
         type = parameterSpec.type,
-        hasDefault = parameterSpec.defaultValue != null
+        defaultValue = parameterSpec.defaultValue
     )
 }

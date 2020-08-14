@@ -1,6 +1,7 @@
 package headout.oss.ergo.codegen.api
 
 import com.squareup.kotlinpoet.AnnotationSpec
+import com.squareup.kotlinpoet.CodeBlock
 import com.squareup.kotlinpoet.TypeName
 import headout.oss.ergo.utils.belongsToType
 import kotlin.reflect.KClass
@@ -15,8 +16,10 @@ data class TargetParameter(
     val name: String,
     val index: Int,
     val type: TypeName,
-    val hasDefault: Boolean,
+    val defaultValue: CodeBlock?,
     val qualifiers: Set<AnnotationSpec>? = null
 ) {
     fun belongsToType(clazz: KClass<*>) = type.belongsToType(clazz)
+
+    val hasDefault = defaultValue != null
 }

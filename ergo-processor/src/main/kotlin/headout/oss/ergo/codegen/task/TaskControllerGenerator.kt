@@ -4,13 +4,11 @@ import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.MemberName.Companion.member
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
-import com.squareup.kotlinpoet.metadata.specs.toTypeSpec
 import headout.oss.ergo.annotations.Task
 import headout.oss.ergo.annotations.TaskId
 import headout.oss.ergo.codegen.api.CachedClassInspector
 import headout.oss.ergo.codegen.api.TargetType
 import headout.oss.ergo.codegen.api.TypeGenerator
-import headout.oss.ergo.codegen.task.TaskMethodGenerator.Companion.PROP_INSTANCE
 import headout.oss.ergo.exceptions.ExceptionUtils
 import headout.oss.ergo.factory.BaseTaskController
 import headout.oss.ergo.factory.InstanceLocatorFactory
@@ -18,21 +16,19 @@ import headout.oss.ergo.models.JobId
 import headout.oss.ergo.models.JobRequest
 import headout.oss.ergo.models.JobRequestData
 import headout.oss.ergo.utils.*
-import me.eugeniomarletti.kotlin.processing.KotlinProcessingEnvironment
-import javax.lang.model.element.ExecutableElement
 import javax.lang.model.element.TypeElement
 
 /**
  * Created by shivanshs9 on 20/05/20.
  */
-@KotlinPoetMetadataPreview
 class TaskControllerGenerator internal constructor(
-    val enclosingElement: TypeElement,
-    val targetType: TargetType,
+    private val enclosingElement: TypeElement,
+    private val targetType: TargetType,
     val bindingClassName: ClassName,
     val tasks: List<TaskMethodGenerator>,
-    val callTaskSpecBuilder: FunSpec.Builder
+    private val callTaskSpecBuilder: FunSpec.Builder
 ) : TypeGenerator {
+
     private val classTypeVariables by lazy {
         arrayOf(
             TypeVariableName.invoke(TYPE_ARG_REQUEST, JobRequestData::class.asTypeName()),
@@ -86,7 +82,11 @@ class TaskControllerGenerator internal constructor(
         .addFunction(overrideCallTaskMethod())
         .build()
 
-    private fun createFunctions() = tasks.map { it.createFunctionSpec() }
+    private fun createFunctions() = tasks.map {
+        it.createFunctionSpec { funBuilder ->
+            funBuilder.returns(classTypeVariables[1])
+        }
+    }
 
     private fun overrideCallTaskMethod(): FunSpec = callTaskSpecBuilder
         .addModifiers(KModifier.OVERRIDE)
@@ -107,6 +107,7 @@ class TaskControllerGenerator internal constructor(
         .endControlFlow()
         .build()
 
+    @KotlinPoetMetadataPreview
     class Builder internal constructor(
         private val targetType: TargetType,
         private val typeElement: TypeElement,
@@ -126,10 +127,7 @@ class TaskControllerGenerator internal constructor(
 
         fun build(): TaskControllerGenerator {
             val tasks = taskBuilders.map { it.build() }
-            val callTaskFunction =
-                classInspector.toTypeSpec(BaseTaskController::class).funSpecs.find { it.name == "callTask" }
-                    ?: error("No method to override with name 'callTask' in 'BaseTaskController'")
-            val callTaskBuilder = callTaskFunction.toBuilder()
+            val callTaskBuilder = classInspector.toTypeSpec(BaseTaskController::class).overrideFunction("callTask")
             return TaskControllerGenerator(
                 typeElement,
                 targetType,
@@ -151,6 +149,9 @@ class TaskControllerGenerator internal constructor(
         const val ARG_JOB_REQUEST = "jobRequest"
         const val ARG_JOB_CALLBACK = "jobCallback"
 
+        const val PROP_INSTANCE = "instance"
+
+        @KotlinPoetMetadataPreview
         fun builder(
             targetType: TargetType,
             typeElement: TypeElement,

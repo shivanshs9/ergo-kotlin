@@ -1,16 +1,18 @@
 package headout.oss.ergo.processors
 
-import com.squareup.kotlinpoet.*
+import com.squareup.kotlinpoet.FileSpec
+import com.squareup.kotlinpoet.MemberName
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
-import headout.oss.ergo.codegen.task.BindingSet
+import com.squareup.kotlinpoet.TypeSpec
+import com.squareup.kotlinpoet.asClassName
+import headout.oss.ergo.codegen.api.TypeGenerator
+import headout.oss.ergo.codegen.task.TaskControllerGenerator
 import headout.oss.ergo.exceptions.ExceptionUtils
 import headout.oss.ergo.factory.IJobParser
 import headout.oss.ergo.factory.JsonFactory
 import headout.oss.ergo.models.EmptyRequestData
 import headout.oss.ergo.models.JobResult
-import headout.oss.ergo.utils.getExecutableElement
-import headout.oss.ergo.utils.tempOverriding
-import kotlinx.serialization.Serializable
+import headout.oss.ergo.utils.overrideFunction
 import me.eugeniomarletti.kotlin.processing.KotlinProcessingEnvironment
 import javax.lang.model.element.TypeElement
 
@@ -18,10 +20,12 @@ import javax.lang.model.element.TypeElement
  * Created by shivanshs9 on 30/05/20.
  */
 class JobParserBinder(
-    val bindingMap: Map<TypeElement, BindingSet>,
+    private val bindingMap: Map<TypeElement, TaskControllerGenerator>,
+    private val jobParserApi: TypeSpec,
     processingEnvironment: KotlinProcessingEnvironment
-) : KotlinProcessingEnvironment by processingEnvironment {
-    fun brewKotlin() =
+) : TypeGenerator, KotlinProcessingEnvironment by processingEnvironment {
+
+    override fun brewKotlin(brewHook: (FileSpec.Builder) -> Unit): FileSpec =
         FileSpec.builder(IJobParser::class.java.packageName, IJobParser.CLASS_NAME_JOB_PARSER)
             .addType(createJobRequestParser())
             .addComment("Generated code by Ergo. DO NOT MODIFY!!")
@@ -36,13 +40,8 @@ class JobParserBinder(
         .addFunction(createSerializeJobResultFunction())
         .build()
 
-    private fun createParseRequestDataFunction() = FunSpec.tempOverriding(
-        IJobParser::class.getExecutableElement(
-            "parseRequestData",
-            elementUtils
-        )!!
-    )
-        .beginControlFlow("return when (%N)", "arg0")
+    private fun createParseRequestDataFunction() = jobParserApi.overrideFunction("parseRequestData")
+        .beginControlFlow("return when (%N)", "taskId")
         .apply {
             val jsonRef = MemberName(JsonFactory::class.asClassName(), "json")
             val emptyRequestClassName = EmptyRequestData::class.asClassName()
@@ -53,7 +52,7 @@ class JobParserBinder(
                         taskBind.task.taskId,
                         jsonRef,
                         taskBind.requestDataClassName,
-                        "arg1"
+                        "rawData"
                     )
                     else addStatement("%S -> %T", taskBind.task.taskId, emptyRequestClassName)
                 }
@@ -63,50 +62,39 @@ class JobParserBinder(
         .endControlFlow()
         .build()
 
-    private fun createNewTaskControllerFunction() = FunSpec.tempOverriding(
-        IJobParser::class.getExecutableElement(
-            "newTaskController",
-            elementUtils
-        )!!
-    )
-        .beginControlFlow("return when (%N)", "arg0")
+    private fun createNewTaskControllerFunction() = jobParserApi.overrideFunction("newTaskController")
+        .beginControlFlow("return when (%N)", "taskId")
         .apply {
             bindingMap.values.forEach { controllerBind ->
                 val controllerClass = controllerBind.bindingClassName
                 controllerBind.tasks.forEach { taskBind ->
                     val requestDataClass = taskBind.requestDataClassName
-                    val resultClass = taskBind.method.resultType
+                    val resultClass = taskBind.targetMethod.returnType
                     val paramControllerClass = controllerClass.parameterizedBy(requestDataClass, resultClass)
                     addStatement(
                         "%S -> %T(%N, %N, %N as %T)",
                         taskBind.task.taskId,
                         paramControllerClass,
-                        "arg0",
-                        "arg1",
-                        "arg2",
+                        "taskId",
+                        "jobId",
+                        "requestData",
                         requestDataClass
                     )
                 }
             }
-            addStatement("else -> %M(%N)", MemberName(ExceptionUtils::class.asClassName(), "taskNotFound"), "arg0")
+            addStatement("else -> %M(%N)", MemberName(ExceptionUtils::class.asClassName(), "taskNotFound"), "taskId")
         }
         .endControlFlow()
         .build()
 
-    private fun createSerializeJobResultFunction() = FunSpec.tempOverriding(
-        IJobParser::class.getExecutableElement(
-            "serializeJobResult",
-            elementUtils
-        )!!
-    )
-        .beginControlFlow("return when (%N.taskId)", "arg0")
+    private fun createSerializeJobResultFunction() = jobParserApi.overrideFunction("serializeJobResult")
+        .beginControlFlow("return when (%N.taskId)", "jobResult")
         .apply {
             val jsonRef = MemberName(JsonFactory::class.asClassName(), "json")
             val jobResultClass = JobResult::class.asClassName()
-            val serializableClassName = Serializable::class.asClassName()
             bindingMap.values.forEach { controllerBind ->
                 controllerBind.tasks.forEach { taskBind ->
-                    val resultClass = taskBind.method.resultType
+                    val resultClass = taskBind.targetMethod.returnType
                     val resultSerializer = BUILTIN_SERIALIZERS[resultClass]
                     val paramJobResultClass = jobResultClass.parameterizedBy(resultClass)
                     beginControlFlow("%S ->", taskBind.task.taskId)
@@ -132,7 +120,7 @@ class JobParserBinder(
                             resultClass
                         )
                     }
-                    addStatement("%M.stringify(serializer, %N as %T)", jsonRef, "arg0", paramJobResultClass)
+                    addStatement("%M.stringify(serializer, %N as %T)", jsonRef, "jobResult", paramJobResultClass)
                     endControlFlow()
                 }
             }
