@@ -2,7 +2,6 @@ package headout.oss.ergo.codegen.task
 
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.MemberName.Companion.member
-import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
 import headout.oss.ergo.annotations.Task
 import headout.oss.ergo.annotations.TaskId
@@ -13,7 +12,6 @@ import headout.oss.ergo.exceptions.ExceptionUtils
 import headout.oss.ergo.factory.BaseTaskController
 import headout.oss.ergo.factory.InstanceLocatorFactory
 import headout.oss.ergo.models.JobId
-import headout.oss.ergo.models.JobRequest
 import headout.oss.ergo.models.JobRequestData
 import headout.oss.ergo.utils.*
 import javax.lang.model.element.TypeElement
@@ -92,14 +90,13 @@ class TaskControllerGenerator internal constructor(
         .addModifiers(KModifier.OVERRIDE)
         .beginControlFlow("return when (taskId)")
         .apply {
-            val jobRequestClass = JobRequest::class.asClassName()
             tasks.forEach {
                 addStatement(
                     "%S -> %N(%N as %T)",
                     it.task.taskId,
                     it.methodName,
                     "jobRequest",
-                    jobRequestClass.parameterizedBy(it.requestDataClassName)
+                    it.getRequestType(it.requestDataClassName)
                 )
             }
             addStatement("else -> %M($PARAM_TASKID)", ExceptionUtils::class.member("taskNotFound"))

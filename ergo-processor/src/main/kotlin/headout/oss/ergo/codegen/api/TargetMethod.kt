@@ -15,9 +15,14 @@ data class TargetMethod(
     val name: String,
     val returnType: TypeName,
     val parameters: List<TargetParameter>,
-    val modifiers: Collection<KModifier>
+    val modifiers: Collection<KModifier>,
+    val isStatic: Boolean = false
 ) {
     val targetParameters by lazy {
         parameters.filter { !it.belongsToType(JobRequest::class) && !it.belongsToType(JobResult::class) }
+    }
+
+    val hasOnlyJobRequestParam by lazy {
+        parameters.size == 1 && parameters[0].belongsToType(JobRequest::class)
     }
 }

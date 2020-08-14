@@ -8,6 +8,7 @@ import headout.oss.ergo.codegen.api.TargetParameter
 import headout.oss.ergo.models.EmptyRequestData
 import headout.oss.ergo.models.JobRequest
 import headout.oss.ergo.models.JobRequestData
+import headout.oss.ergo.utils.belongsToType
 import headout.oss.ergo.utils.getFromConstructor
 import kotlinx.serialization.Serializable
 
@@ -20,9 +21,12 @@ class TaskMethodGenerator internal constructor(
     val targetMethod: TargetMethod,
     private val targetClassName: ClassName
 ) {
-    val requestDataClassName by lazy {
-        if (isRequestDataNeeded()) ClassName(targetClassName.packageName, "$PREFIX_CLASS_REQUEST_DATA$methodName")
-        else EmptyRequestData::class.asClassName()
+    val requestDataClassName: TypeName by lazy {
+        when {
+            isRequestDataNeeded() -> ClassName(targetClassName.packageName, "$PREFIX_CLASS_REQUEST_DATA$methodName")
+            targetMethod.hasOnlyJobRequestParam -> (targetMethod.parameters[0].type as ParameterizedTypeName).typeArguments[0]
+            else -> EmptyRequestData::class.asClassName()
+        }
     }
 
     fun createFunctionSpec(genHook: (FunSpec.Builder) -> Unit = { }): FunSpec =
@@ -37,12 +41,13 @@ class TaskMethodGenerator internal constructor(
                         else -> error("No arg found for '${it.name}' (${it.type}) in '${targetMethod.name}' method")
                     }
                 }
-                val methodReceiver = TaskControllerGenerator.PROP_INSTANCE
+                val methodReceiver =
+                    if (targetMethod.isStatic) targetClassName.simpleName else TaskControllerGenerator.PROP_INSTANCE
                 addStatement("return %L.%L(${targetArgs.joinToString(", ")}) as Res", methodReceiver, targetMethod.name)
             }
             .build()
 
-    fun createRequestDataSpec(): TypeSpec = TypeSpec.classBuilder(requestDataClassName)
+    fun createRequestDataSpec(): TypeSpec = TypeSpec.classBuilder(requestDataClassName as ClassName)
         .addSuperinterface(JobRequestData::class)
         .addAnnotation(Serializable::class)
         .addModifiers(KModifier.DATA)
@@ -64,7 +69,8 @@ class TaskMethodGenerator internal constructor(
 
     fun isRequestDataNeeded() = targetMethod.targetParameters.isNotEmpty()
 
-    private fun getRequestType(type: TypeName): TypeName = JobRequest::class.asTypeName().plusParameter(type)
+    fun getRequestType(type: TypeName): TypeName =
+        if (type.belongsToType(JobRequest::class)) type else JobRequest::class.asTypeName().plusParameter(type)
 
     class Builder internal constructor(
         private val task: Task,

@@ -7,10 +7,12 @@ import headout.oss.ergo.codegen.api.CachedClassInspector
 import headout.oss.ergo.codegen.api.TargetMethod
 import headout.oss.ergo.codegen.api.TargetParameter
 import headout.oss.ergo.codegen.api.TargetType
+import headout.oss.ergo.utils.toFunSpec
 import headout.oss.ergo.utils.visibility
 import me.eugeniomarletti.kotlin.processing.KotlinProcessingEnvironment
 import javax.lang.model.element.ElementKind
 import javax.lang.model.element.ExecutableElement
+import javax.lang.model.element.Modifier
 import javax.lang.model.element.TypeElement
 
 /**
@@ -23,14 +25,15 @@ private fun KotlinProcessingEnvironment.javaTargetType(
         .filter { it.kind == ElementKind.METHOD }
         .map { elem ->
             val method = elem as ExecutableElement
-            val funSpec = FunSpec.overriding(method).apply {
+            val funSpec = method.toFunSpec().apply {
                 modifiers.remove(KModifier.OVERRIDE)
             }
             TargetMethod(
                 name = method.simpleName.toString(),
                 returnType = method.returnType.asTypeName(),
                 modifiers = funSpec.modifiers,
-                parameters = funSpec.parameters.toTargetParameters()
+                parameters = funSpec.parameters.toTargetParameters(),
+                isStatic = method.modifiers.contains(Modifier.STATIC)
             )
         }.associateBy { it.name }
     return TargetType(

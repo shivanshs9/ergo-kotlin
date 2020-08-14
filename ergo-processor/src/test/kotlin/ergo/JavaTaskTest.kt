@@ -14,7 +14,7 @@ import org.junit.Test
  */
 class JavaTaskTest {
     @Test
-    fun noArg() {
+    fun staticNoArg() {
         val source = """
             package example.tasks;
             
@@ -33,7 +33,7 @@ class JavaTaskTest {
     }
 
     @Test
-    fun oneArg() {
+    fun staticOneArg() {
         val source = """
             package example.tasks;
             
@@ -43,46 +43,6 @@ class JavaTaskTest {
                 @Task(taskId="oneArg")
                 public static int square(int num) {
                     return num * num;
-                }
-            }
-        """.trimIndent()
-
-        val result = compile(source)
-        assertResult(result)
-    }
-
-    @Test
-    fun noArgWithJobCallback() {
-        val source = """
-            package example.tasks;
-            
-            import headout.oss.ergo.annotations.Task;
-            import headout.oss.ergo.listeners.JobCallback;
-            
-            class ExampleTask {
-                @Task(taskId="noArgWithJobCallback")
-                public static void longProcess(JobCallback<String> callback) {
-                    callback.success("hello world");
-                }
-            }
-        """.trimIndent()
-
-        val result = compile(source)
-        assertResult(result)
-    }
-
-    @Test
-    fun oneArgWithJobCallback() {
-        val source = """
-            package example.tasks;
-            
-            import headout.oss.ergo.annotations.Task;
-            import headout.oss.ergo.listeners.JobCallback;
-            
-            class ExampleTask {
-                @Task(taskId="oneArgWithJobCallback")
-                public static void longProcess(Integer num, JobCallback<Integer> callback) {
-                    callback.success(num * num);
                 }
             }
         """.trimIndent()
@@ -110,6 +70,43 @@ class JavaTaskTest {
         assertResult(result)
     }
 
+    @Test
+    fun oneArgWithJobRequest() {
+        val source = """
+            package example.tasks;
+            
+            import headout.oss.ergo.annotations.Task;
+            import headout.oss.ergo.models.JobRequest;
+            
+            class ExampleTask {
+                @Task(taskId="oneArgWithJobRequest")
+                public int oneArgWithJobRequest(JobRequest<IntRequest> request) {
+                    System.out.println("doing some work...");
+                    return request.getRequestData().num;
+                }
+            }
+        """.trimIndent()
+
+        val dataSource = """
+            package example.tasks;
+            
+            import kotlinx.serialization.Serializable;
+            import headout.oss.ergo.models.JobRequestData;
+            
+            @Serializable
+            public class IntRequest implements JobRequestData {
+                public int num;
+                
+                IntRequest(int num) {
+                    this.num = num;
+                }
+            }
+        """.trimIndent()
+
+        val result = compile(source, "IntRequest.java" to dataSource)
+        assertResult(result)
+    }
+
     private fun assertResult(result: KotlinCompilation.Result) {
         result.sourcesGeneratedByAnnotationProcessor.forEach {
             println(it.canonicalPath)
@@ -118,13 +115,19 @@ class JavaTaskTest {
         assertThat(result.exitCode).isEqualTo(ExitCode.OK)
     }
 
-    private fun compile(@Language("java") source: String) = KotlinCompilation().apply {
-        sources = listOf(SourceFile.java(EXAMPLE_JAVA_FILE, source))
-        annotationProcessors = listOf(TaskProcessor())
-        inheritClassPath = true
-        compilerPlugins = listOf(SerializationComponentRegistrar())
-        messageOutputStream = System.out
-    }.compile()
+    private fun compile(@Language("java") source: String, vararg helpers: Pair<String, String>) =
+        KotlinCompilation().apply {
+            sources = listOf(SourceFile.java(EXAMPLE_JAVA_FILE, source)) + helpers.map {
+                SourceFile.java(
+                    it.first,
+                    it.second
+                )
+            }
+            annotationProcessors = listOf(TaskProcessor())
+            inheritClassPath = true
+            compilerPlugins = listOf(SerializationComponentRegistrar())
+            messageOutputStream = System.out
+        }.compile()
 
     companion object {
         const val EXAMPLE_JAVA_FILE = "ExampleTask.java"
