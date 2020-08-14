@@ -56,11 +56,13 @@ class SqsMsgService(
         produce(Dispatchers.IO, CAPACITY_REQUEST_BUFFER) {
             repeatUntilCancelled(BaseMsgService.Companion::collectCaughtExceptions) {
                 val messages = sqs.receiveMessage(receiveRequest).await().messages()
-                logger.info { "Received ${messages.size} messages - $messages" }
+                logger.info { "Received ${messages.size} messages" }
                 for (msg in messages) {
                     val groupId = msg.attributes()[MessageSystemAttributeName.MESSAGE_GROUP_ID]
                         ?: error("Message doesn't have 'MessageGroupId' key!")
-                    val requestMsg = RequestMsg(toTaskId(groupId), msg.messageId(), msg)
+                    val requestMsg = RequestMsg(toTaskId(groupId), msg.messageId(), msg).also {
+                        logger.debug { "Received request - $it" }
+                    }
                     pendingJobs.add(requestMsg.jobId)
                     send(requestMsg)
                     sendDelayed(captures, PingMessageCapture(requestMsg), defaultPingMessageDelay)
@@ -114,7 +116,7 @@ class SqsMsgService(
     private suspend fun handleSuccess(resultCapture: SuccessResultCapture<Message>) =
         deleteMessage(resultCapture.request)
 
-    private suspend fun pushResults(jobResults: List<JobResult<*>>) = launch(currentCoroutineContext()) {
+    private suspend fun pushResults(jobResults: List<JobResult<*>>) = launch(Dispatchers.IO) {
         logger.info { "Pushing ${jobResults.size} results!" }
         val msgEntries = jobResults.mapIndexed { index, jobResult ->
             val msgBody = parseResult(jobResult)
@@ -144,7 +146,7 @@ class SqsMsgService(
     }
 
     private suspend fun changeVisibilityTimeout(request: RequestMsg<Message>, visibilityTimeout: Int) =
-        launch(currentCoroutineContext()) {
+        launch(Dispatchers.IO) {
             logger.info { "Change visibility timeout of message with jobId '${request.jobId}' to $visibilityTimeout" }
             sqs.changeMessageVisibility {
                 it.queueUrl(requestQueueUrl)
@@ -153,7 +155,7 @@ class SqsMsgService(
             }.await()
         }
 
-    private suspend fun deleteMessage(request: RequestMsg<Message>) = launch(currentCoroutineContext()) {
+    private suspend fun deleteMessage(request: RequestMsg<Message>) = launch(Dispatchers.IO) {
         logger.info { "Deleting message with jobId - ${request.jobId}" }
         sqs.deleteMessage {
             it.queueUrl(requestQueueUrl)

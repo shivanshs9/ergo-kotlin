@@ -26,7 +26,7 @@ suspend fun CoroutineScope.repeatUntilCancelled(exceptionHandler: (Throwable) ->
             exceptionHandler(ex)
         }
     }
-    logger.debug("coroutine on ${currentThread().name} exiting")
+    logger.warn { "coroutine on ${currentThread().name} exiting" }
 }
 
 fun CoroutineScope.workers(

@@ -33,6 +33,7 @@ abstract class BaseMsgService<T>(
         immortalWorkers(numWorkers, exceptionHandler = Companion::collectCaughtExceptions) { workerId ->
             for (request in requests) {
                 val result = runCatching {
+                    logger.info { "Processing request - $request" }
                     processRequest(request)
                 }.onFailure { exc ->
                     logger.error(

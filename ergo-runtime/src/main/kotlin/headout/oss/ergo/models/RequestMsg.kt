@@ -5,4 +5,8 @@ import headout.oss.ergo.annotations.TaskId
 /**
  * Created by shivanshs9 on 29/05/20.
  */
-data class RequestMsg<T>(val taskId: TaskId, val jobId: JobId, val message: T)
+data class RequestMsg<T>(val taskId: TaskId, val jobId: JobId, val message: T) {
+    override fun toString(): String {
+        return "RequestMsg(taskId=$taskId, jobId=$jobId)"
+    }
+}
