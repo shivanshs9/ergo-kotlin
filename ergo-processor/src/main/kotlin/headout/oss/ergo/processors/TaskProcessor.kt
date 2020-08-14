@@ -1,23 +1,37 @@
 package headout.oss.ergo.processors
 
 import com.google.auto.service.AutoService
-import com.squareup.kotlinpoet.asTypeName
+import com.squareup.kotlinpoet.classinspector.elements.ElementsClassInspector
+import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
 import headout.oss.ergo.annotations.Task
+import headout.oss.ergo.codegen.api.CachedClassInspector
+import headout.oss.ergo.codegen.targetType
+import headout.oss.ergo.codegen.task.TaskControllerGenerator
+import headout.oss.ergo.factory.IJobParser
 import me.eugeniomarletti.kotlin.processing.KotlinAbstractProcessor
-import me.eugeniomarletti.kotlin.processing.KotlinProcessingEnvironment
 import java.io.IOException
 import javax.annotation.processing.FilerException
 import javax.annotation.processing.Processor
 import javax.annotation.processing.RoundEnvironment
 import javax.lang.model.SourceVersion
-import javax.lang.model.element.*
+import javax.lang.model.element.Element
+import javax.lang.model.element.ElementKind
+import javax.lang.model.element.ExecutableElement
+import javax.lang.model.element.TypeElement
 import javax.tools.Diagnostic
 
 /**
  * Created by shivanshs9 on 20/05/20.
  */
+@OptIn(KotlinPoetMetadataPreview::class)
 @AutoService(Processor::class)
 class TaskProcessor : KotlinAbstractProcessor() {
+    internal val classInspector by lazy {
+        CachedClassInspector(
+            ElementsClassInspector.create(elementUtils, typeUtils)
+        )
+    }
+
     override fun getSupportedAnnotationTypes(): Set<String> = setOf(ANNOTATION_TYPE.canonicalName)
 
     override fun process(annotations: Set<TypeElement>, roundEnv: RoundEnvironment): Boolean {
@@ -28,14 +42,15 @@ class TaskProcessor : KotlinAbstractProcessor() {
             }.onFailure { handleBrewError(it, binding.key) }
         }
         kotlin.runCatching {
-            val jobParserBinder = JobParserBinder(bindingMap, this)
+            val jobParserApi = classInspector.toTypeSpec(IJobParser::class)
+            val jobParserBinder = JobParserBinder(bindingMap, jobParserApi, this)
             jobParserBinder.brewKotlin().writeTo(filer)
         }.onFailure { if (it !is FilerException) error(it) }
         return false
     }
 
-    private fun processTargets(roundEnv: RoundEnvironment): Map<TypeElement, BindingSet> {
-        val builderMap = mutableMapOf<TypeElement, BindingSet.Builder>()
+    private fun processTargets(roundEnv: RoundEnvironment): Map<TypeElement, TaskControllerGenerator> {
+        val builderMap = mutableMapOf<TypeElement, TaskControllerGenerator.Builder>()
         roundEnv.getElementsAnnotatedWith(ANNOTATION_TYPE).forEach { element ->
             if (element.kind == ElementKind.METHOD && element is ExecutableElement) {
                 processMethodBinding(roundEnv, element, builderMap)
@@ -47,23 +62,13 @@ class TaskProcessor : KotlinAbstractProcessor() {
     private fun processMethodBinding(
         roundEnv: RoundEnvironment,
         element: ExecutableElement,
-        builderMap: MutableMap<TypeElement, BindingSet.Builder>
+        builderMap: MutableMap<TypeElement, TaskControllerGenerator.Builder>
     ) {
         val classElement = (element.enclosingElement as TypeElement)
         val methodName = element.simpleName.toString()
         val annotation = element.getAnnotation(ANNOTATION_TYPE)
-        val returnType = element.returnType
-
-        val parameters = element.parameters.map { MethodParameter(it) }
-
-        val methodSignature = MethodSignature(
-            methodName,
-            parameters,
-            returnType.asTypeName(),
-            isStatic = element.modifiers.contains(Modifier.STATIC)
-        )
         builderMap.attachElement(classElement, this).apply {
-            addMethod(annotation, methodSignature)
+            addMethod(annotation, methodName)
         }
     }
 
@@ -109,8 +114,12 @@ class TaskProcessor : KotlinAbstractProcessor() {
     }
 }
 
-private fun MutableMap<TypeElement, BindingSet.Builder>.attachElement(
+@KotlinPoetMetadataPreview
+private fun MutableMap<TypeElement, TaskControllerGenerator.Builder>.attachElement(
     enclosingElement: TypeElement,
-    processingEnvironment: KotlinProcessingEnvironment
+    taskProcessor: TaskProcessor
 ) =
-    getOrPut(enclosingElement) { BindingSet.newBuilder(enclosingElement, processingEnvironment) }
+    getOrPut(enclosingElement) {
+        val targetType = taskProcessor.targetType(enclosingElement, taskProcessor.classInspector)
+        TaskControllerGenerator.builder(targetType, enclosingElement, taskProcessor.classInspector)
+    }

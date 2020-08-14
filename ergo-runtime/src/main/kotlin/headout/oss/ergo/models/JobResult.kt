@@ -30,6 +30,7 @@ data class JobResultMetadata internal constructor(
     enum class STATUS(val code: Int) {
         SUCCESS(200),
 
+        ERROR_LIBRARY_JOB_CANCELLED(503),
         ERROR_LIBRARY_INTERNAL(502), ERROR_PARSE(422), ERROR_NOT_FOUND(404),
 
         ERROR_CLIENT_INTERNAL(500), ERROR_INVALID_REQUEST(400), ERROR_FORBIDDEN(403)

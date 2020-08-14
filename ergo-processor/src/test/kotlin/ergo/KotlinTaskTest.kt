@@ -14,7 +14,7 @@ import org.junit.Test
  */
 class KotlinTaskTest {
     @Test
-    fun noArg() {
+    fun staticNoArg() {
         val source = """
             package example.tasks
             
@@ -23,6 +23,23 @@ class KotlinTaskTest {
             object ExampleTask {
                 @Task(taskId="noArg")
                 @JvmStatic
+                fun noArg(): Boolean = true
+            }
+        """.trimIndent()
+
+        val result = compile(source)
+        assertResult(result)
+    }
+
+    @Test
+    fun noArg() {
+        val source = """
+            package example.tasks
+            
+            import headout.oss.ergo.annotations.Task
+            
+            class ExampleTask {
+                @Task(taskId="noArg")
                 fun noArg(): Boolean = true
             }
         """.trimIndent()
@@ -50,17 +67,20 @@ class KotlinTaskTest {
     }
 
     @Test
-    fun noArgWithJobCallback() {
+    fun suspendNoArg() {
         val source = """
             package example.tasks
             
             import headout.oss.ergo.annotations.Task
             import headout.oss.ergo.listeners.JobCallback
+            import kotlinx.coroutines.delay
             
-            object ExampleTask {
-                @Task(taskId="noArgWithJobCallback")
-                @JvmStatic
-                fun longProcess(callback: JobCallback<String>) = callback.success("hello world") 
+            class ExampleTask {
+                @Task(taskId="suspendNoArg")
+                suspend fun longProcess(): String {
+                    delay(2000)
+                    return "hello world"
+                }
             }
         """.trimIndent()
 
@@ -69,17 +89,16 @@ class KotlinTaskTest {
     }
 
     @Test
-    fun oneArgWithJobCallback() {
+    fun suspendOneArg() {
         val source = """
             package example.tasks
             
             import headout.oss.ergo.annotations.Task
             import headout.oss.ergo.listeners.JobCallback
             
-            object ExampleTask {
-                @Task(taskId="oneArgWithJobCallback")
-                @JvmStatic
-                fun longProcess(num: Int, callback: JobCallback<Int>) = callback.success(num * num) 
+            class ExampleTask {
+                @Task(taskId="suspendOneArg")
+                suspend fun longProcess(num: Int) = num * num 
             }
         """.trimIndent()
 
@@ -140,6 +159,27 @@ class KotlinTaskTest {
                 @Task(taskId="noArgWithUnitResult")
                 fun noArgWithUnitResult(): Unit {
                     println("doing some work...")
+                }
+            }
+        """.trimIndent()
+
+        val result = compile(source)
+        assertResult(result)
+    }
+
+    // Default Value is not yet supported in kotlinpoet so the
+    // generated request data class is actually invalid
+    @Test
+    fun oneArgWithDefaultValue() {
+        val source = """
+            package example.tasks
+            
+            import headout.oss.ergo.annotations.Task
+            
+            class ExampleTask {
+                @Task(taskId="oneArgWithDefaultValue")
+                fun oneArgWithDefaultValue(num: Int = 134) {
+                    println("doing some work x $\num...")
                 }
             }
         """.trimIndent()

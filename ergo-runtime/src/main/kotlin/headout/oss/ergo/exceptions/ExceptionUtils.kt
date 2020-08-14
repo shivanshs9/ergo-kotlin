@@ -1,6 +1,7 @@
 package headout.oss.ergo.exceptions
 
 import headout.oss.ergo.annotations.TaskId
+import kotlinx.coroutines.CancellationException
 
 /**
  * Created by shivanshs9 on 24/05/20.
@@ -8,13 +9,13 @@ import headout.oss.ergo.annotations.TaskId
 object ExceptionUtils {
     // Called by client on error
     fun processClientError(error: Throwable): BaseJobError = when (error) {
-        // TODO: Handle more errors
+        is CancellationException -> JobCancellationError(error)
         else -> ClientInternalError(error)
     }
 
     // Called by library on error
     fun processLibraryError(error: Throwable): BaseLibraryError = when (error) {
-        // TODO: Handle more errors
+        is CancellationException -> JobCancellationError(error)
         else -> LibraryInternalError(error)
     }
 

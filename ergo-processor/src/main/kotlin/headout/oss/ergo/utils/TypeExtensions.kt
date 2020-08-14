@@ -2,16 +2,11 @@ package headout.oss.ergo.utils
 
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
-import me.eugeniomarletti.kotlin.metadata.shadow.name.FqName
-import me.eugeniomarletti.kotlin.metadata.shadow.platform.JavaToKotlinClassMap
 import javax.lang.model.element.*
 import javax.lang.model.type.DeclaredType
 import javax.lang.model.type.TypeMirror
 import javax.lang.model.type.TypeVariable
-import javax.lang.model.util.Elements
-import kotlin.coroutines.Continuation
 import kotlin.reflect.KClass
-import kotlin.reflect.KFunction
 
 /**
  * Created by shivanshs9 on 21/05/20.
@@ -42,43 +37,47 @@ fun TypeMirror.belongsToType(expectedType: String): Boolean {
 
 fun <T : Any> TypeMirror.belongsToType(expectedKlazz: KClass<T>) = belongsToType(expectedKlazz.qualifiedName.toString())
 
+val TypeElement.kotlinMetadata: Metadata?
+    get() = getAnnotation(Metadata::class.java)
+
+val TypeElement.packageElement: PackageElement
+    get() {
+        var element: Element = this
+        while (element.kind != ElementKind.PACKAGE) {
+            element = element.enclosingElement
+        }
+        return element as PackageElement
+    }
+
 fun PropertySpec.Companion.getFromConstructor(name: String, typeName: TypeName) =
     builder(name, typeName).initializer(name).build()
 
-// Proposed at https://github.com/square/kotlinpoet/issues/236#issuecomment-377784099
-fun Element.javaToKotlinType(): TypeName = asType().asTypeName().javaToKotlinType()
+private val VISIBILITY_KMODIFIERS = setOf(
+    KModifier.INTERNAL,
+    KModifier.PRIVATE,
+    KModifier.PROTECTED,
+    KModifier.PUBLIC
+)
 
-fun TypeName.javaToKotlinType(): TypeName = when (this) {
-    is ParameterizedTypeName -> {
-        (rawType.javaToKotlinType() as ClassName).parameterizedBy(
-            *typeArguments.map {
-                it.javaToKotlinType()
-            }.toTypedArray()
-        )
+private val VISIBILITY_MODIFIERS_MAP = mapOf(
+    Modifier.PRIVATE to KModifier.PRIVATE,
+    Modifier.PROTECTED to KModifier.PROTECTED,
+    Modifier.PUBLIC to KModifier.PUBLIC
+)
+
+fun Collection<KModifier>.visibility(): KModifier = find { it in VISIBILITY_KMODIFIERS } ?: KModifier.PUBLIC
+
+fun Set<Modifier>.visibility(): KModifier =
+    find { it in VISIBILITY_MODIFIERS_MAP.keys }?.let { VISIBILITY_MODIFIERS_MAP[it] } ?: KModifier.PUBLIC
+
+fun Collection<FunSpec>.withName(name: String): FunSpec =
+    find { it.name == name } ?: error("No method found with name '$name'")
+
+fun TypeSpec.overrideFunction(name: String): FunSpec.Builder = funSpecs.withName(name).toBuilder()
+    .addModifiers(KModifier.OVERRIDE)
+    .apply {
+        modifiers.remove(KModifier.ABSTRACT)
     }
-    is WildcardTypeName -> {
-        if (inTypes.isNotEmpty()) WildcardTypeName.consumerOf(inTypes[0].javaToKotlinType())
-        else WildcardTypeName.producerOf(outTypes[0].javaToKotlinType())
-    }
-
-    else -> {
-        val className = JavaToKotlinClassMap
-            .mapJavaToKotlin(FqName(toString()))?.asSingleFqName()?.asString()
-        if (className == null) this
-        else ClassName.bestGuess(className)
-    }
-}
-
-fun KClass<*>.getExecutableElement(functionName: String, elements: Elements): ExecutableElement? =
-    elements.getAllMembers(elements.getTypeElement(qualifiedName))
-        .find { it.kind == ElementKind.METHOD && it.simpleName.contentEquals(functionName) } as? ExecutableElement
-
-fun KClass<*>.getExecutableElement(function: KFunction<*>, elements: Elements): ExecutableElement? =
-    getExecutableElement(function.name, elements)
-
-fun TypeSpec.Builder.addSuperclassConstructorParameters(vararg params: CodeBlock) = apply {
-    params.forEach { addSuperclassConstructorParameter(it) }
-}
 
 fun TypeSpec.Builder.addSuperclassConstructorParameters(vararg params: String) = apply {
     params.forEach { addSuperclassConstructorParameter(it) }
@@ -96,21 +95,10 @@ fun TypeSpec.Builder.addTypeVariables(vararg typeVars: TypeVariableName) = apply
     this.typeVariables += typeVars // instead of first converting to list and calling addTypeVariables(Iterable<TypeVariableName>)
 }
 
-/* Temporary hack until https://github.com/square/kotlinpoet/issues/914 and
- * https://github.com/square/kotlinpoet/issues/915 are fixed.
- * TODO: Merge their PRs
- */
-fun FunSpec.Companion.tempOverriding(method: ExecutableElement): FunSpec.Builder {
-    var modifiers: Set<Modifier> = method.modifiers
-    require(
-        Modifier.PRIVATE !in modifiers &&
-                Modifier.FINAL !in modifiers &&
-                Modifier.STATIC !in modifiers
-    ) {
-        "cannot override method with modifiers: $modifiers"
-    }
+fun ExecutableElement.toFunSpec(): FunSpec.Builder {
+    var modifiers: Set<Modifier> = modifiers
 
-    val methodName = method.simpleName.toString()
+    val methodName = simpleName.toString()
     val funBuilder = FunSpec.builder(methodName)
 
     funBuilder.addModifiers(KModifier.OVERRIDE)
@@ -119,39 +107,25 @@ fun FunSpec.Companion.tempOverriding(method: ExecutableElement): FunSpec.Builder
     modifiers.remove(Modifier.ABSTRACT)
     funBuilder.jvmModifiers(modifiers)
 
-    method.typeParameters
+    typeParameters
         .map { it.asType() as TypeVariable }
         .map { it.asTypeVariableName() }
         .forEach { funBuilder.addTypeVariable(it) }
 
-    funBuilder.returns(method.returnType.asTypeName().javaToKotlinType())
-    funBuilder.addParameters(method.parameters.map {
-        ParameterSpec.builder(it.simpleName.toString(), it.javaToKotlinType()).build()
-    })
-    val lastIndex = funBuilder.parameters.lastIndex
-    if (method.isVarArgs) {
-        // TODO: isVarArgs is false for suspending vararg functions
-        funBuilder.parameters[lastIndex] = funBuilder.parameters.last()
+    funBuilder.returns(returnType.asTypeName())
+    funBuilder.addParameters(ParameterSpec.parametersOf(this))
+    if (isVarArgs) {
+        funBuilder.parameters[funBuilder.parameters.lastIndex] = funBuilder.parameters.last()
             .toBuilder()
             .addModifiers(KModifier.VARARG)
             .build()
-    } else {
-        funBuilder.parameters.last().also {
-            if (it.type.belongsToType(Continuation::class)) {
-                funBuilder.parameters.removeAt(lastIndex)
-                funBuilder.addModifiers(KModifier.SUSPEND)
-                var typeArg = (it.type as ParameterizedTypeName).typeArguments[0]
-                if (typeArg is WildcardTypeName) typeArg = typeArg.inTypes[0]
-                funBuilder.returns(typeArg)
-            }
-        }
     }
 
-    if (method.thrownTypes.isNotEmpty()) {
-        val throwsValueString = method.thrownTypes.joinToString { "%T::class" }
+    if (thrownTypes.isNotEmpty()) {
+        val throwsValueString = thrownTypes.joinToString { "%T::class" }
         funBuilder.addAnnotation(
             AnnotationSpec.builder(Throws::class)
-                .addMember(throwsValueString, *method.thrownTypes.toTypedArray())
+                .addMember(throwsValueString, *thrownTypes.toTypedArray())
                 .build()
         )
     }

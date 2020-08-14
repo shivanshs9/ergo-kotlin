@@ -1,34 +1,32 @@
-package headout.oss.ergo.processors
+package headout.oss.ergo.codegen.task
 
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.MemberName.Companion.member
-import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
+import com.squareup.kotlinpoet.metadata.KotlinPoetMetadataPreview
 import headout.oss.ergo.annotations.Task
 import headout.oss.ergo.annotations.TaskId
+import headout.oss.ergo.codegen.api.CachedClassInspector
+import headout.oss.ergo.codegen.api.TargetType
+import headout.oss.ergo.codegen.api.TypeGenerator
 import headout.oss.ergo.exceptions.ExceptionUtils
 import headout.oss.ergo.factory.BaseTaskController
 import headout.oss.ergo.factory.InstanceLocatorFactory
 import headout.oss.ergo.models.JobId
-import headout.oss.ergo.models.JobRequest
 import headout.oss.ergo.models.JobRequestData
-import headout.oss.ergo.utils.addSuperclassConstructorParameters
-import headout.oss.ergo.utils.addTypeVariables
-import headout.oss.ergo.utils.getExecutableElement
-import headout.oss.ergo.utils.superclass
-import me.eugeniomarletti.kotlin.processing.KotlinProcessingEnvironment
-import javax.lang.model.element.*
+import headout.oss.ergo.utils.*
+import javax.lang.model.element.TypeElement
 
 /**
  * Created by shivanshs9 on 20/05/20.
  */
-class BindingSet internal constructor(
-    val enclosingElement: TypeElement,
-    val targetType: TypeName,
+class TaskControllerGenerator internal constructor(
+    private val enclosingElement: TypeElement,
+    private val targetType: TargetType,
     val bindingClassName: ClassName,
-    val isFinal: Boolean,
-    val tasks: List<TaskBinder>,
-    private val processingEnvironment: KotlinProcessingEnvironment
-) {
+    val tasks: List<TaskMethodGenerator>,
+    private val callTaskSpecBuilder: FunSpec.Builder
+) : TypeGenerator {
+
     private val classTypeVariables by lazy {
         arrayOf(
             TypeVariableName.invoke(TYPE_ARG_REQUEST, JobRequestData::class.asTypeName()),
@@ -36,10 +34,11 @@ class BindingSet internal constructor(
         )
     }
 
-    fun brewKotlin(): FileSpec = createType().let { type ->
-        FileSpec.builder(bindingClassName.packageName, type.name!!)
-            .addType(type)
+    override fun brewKotlin(brewHook: (FileSpec.Builder) -> Unit): FileSpec = createType().let { bindingType ->
+        FileSpec.builder(bindingClassName.packageName, bindingType.name!!)
+            .addType(bindingType)
             .apply {
+                brewHook(this)
                 tasks.forEach {
                     if (it.isRequestDataNeeded()) addType(it.createRequestDataSpec())
                 }
@@ -52,8 +51,12 @@ class BindingSet internal constructor(
         .addModifiers(KModifier.PUBLIC)
         .addOriginatingElement(enclosingElement)
         .apply {
-            val instanceProp = PropertySpec.builder(PROP_INSTANCE, targetType, KModifier.PRIVATE)
-                .initializer("%M(%L)", InstanceLocatorFactory::class.member("getInstance"), "${enclosingElement.simpleName}::class")
+            val instanceProp = PropertySpec.builder(PROP_INSTANCE, targetType.className, KModifier.PRIVATE)
+                .initializer(
+                    "%M(%L)",
+                    InstanceLocatorFactory::class.member("getInstance"),
+                    "${enclosingElement.simpleName}::class"
+                )
                 .build()
             addProperty(instanceProp)
         }
@@ -66,34 +69,34 @@ class BindingSet internal constructor(
                 .addParameter(ParameterSpec(PARAM_REQUESTDATA, classTypeVariables[0]))
                 .build()
         )
-        .addSuperclassConstructorParameters(PARAM_TASKID, PARAM_JOBID, PARAM_REQUESTDATA)
+        .addSuperclassConstructorParameters(
+            PARAM_TASKID,
+            PARAM_JOBID,
+            PARAM_REQUESTDATA
+        )
         .apply {
-            if (isFinal) addModifiers(KModifier.FINAL)
             addFunctions(createFunctions())
         }
         .addFunction(overrideCallTaskMethod())
         .build()
 
-    private fun createFunctions() = tasks.map { it.createFunctionSpec() }
+    private fun createFunctions() = tasks.map {
+        it.createFunctionSpec { funBuilder ->
+            funBuilder.returns(classTypeVariables[1])
+        }
+    }
 
-    private fun overrideCallTaskMethod(): FunSpec = FunSpec.overriding(
-        BaseTaskController::class.getExecutableElement(
-            "callTask",
-            processingEnvironment.elementUtils
-        )!!
-    )
+    private fun overrideCallTaskMethod(): FunSpec = callTaskSpecBuilder
+        .addModifiers(KModifier.OVERRIDE)
         .beginControlFlow("return when (taskId)")
         .apply {
-            val jobRequestClass = JobRequest::class.asClassName()
             tasks.forEach {
                 addStatement(
-                    "%S -> %N(%N as %T, %N as %T)",
+                    "%S -> %N(%N as %T)",
                     it.task.taskId,
                     it.methodName,
-                    "arg0",
-                    jobRequestClass.parameterizedBy(it.requestDataClassName),
-                    "arg1",
-                    it.method.callbackType
+                    "jobRequest",
+                    it.getRequestType(it.requestDataClassName)
                 )
             }
             addStatement("else -> %M($PARAM_TASKID)", ExceptionUtils::class.member("taskNotFound"))
@@ -101,30 +104,33 @@ class BindingSet internal constructor(
         .endControlFlow()
         .build()
 
+    @KotlinPoetMetadataPreview
     class Builder internal constructor(
-        private val enclosingElement: TypeElement,
-        private val isFinal: Boolean,
-        private val processingEnvironment: KotlinProcessingEnvironment
+        private val targetType: TargetType,
+        private val typeElement: TypeElement,
+        private val classInspector: CachedClassInspector
     ) {
-        private val targetType by lazy { enclosingElement.asClassName() }
-        private val taskBuilders: MutableSet<TaskBinder.Builder> = mutableSetOf()
+        private val taskBuilders: MutableSet<TaskMethodGenerator.Builder> = mutableSetOf()
 
-        fun addMethod(task: Task, methodSignature: MethodSignature): Boolean {
-            val taskBuilder = TaskBinder.newBuilder(task, targetType).apply {
-                this.methodSignature = methodSignature
-            }.also { taskBuilders.add(it) }
+        fun addMethod(task: Task, methodName: String): Boolean {
+            val method = targetType.methods[methodName] ?: return false
+            TaskMethodGenerator.builder(
+                task,
+                method,
+                targetType.className
+            ).also { taskBuilders.add(it) }
             return true
         }
 
-        fun build(): BindingSet {
+        fun build(): TaskControllerGenerator {
             val tasks = taskBuilders.map { it.build() }
-            return BindingSet(
-                enclosingElement,
+            val callTaskBuilder = classInspector.toTypeSpec(BaseTaskController::class).overrideFunction("callTask")
+            return TaskControllerGenerator(
+                typeElement,
                 targetType,
-                enclosingElement.getBindingClassName(),
-                isFinal,
+                typeElement.getBindingClassName(),
                 tasks,
-                processingEnvironment
+                callTaskBuilder
             )
         }
     }
@@ -142,9 +148,17 @@ class BindingSet internal constructor(
 
         const val PROP_INSTANCE = "instance"
 
-        fun newBuilder(enclosingElement: TypeElement, processingEnvironment: KotlinProcessingEnvironment): Builder {
-            val isFinal = enclosingElement.modifiers.contains(Modifier.FINAL)
-            return Builder(enclosingElement, isFinal, processingEnvironment)
+        @KotlinPoetMetadataPreview
+        fun builder(
+            targetType: TargetType,
+            typeElement: TypeElement,
+            classInspector: CachedClassInspector
+        ): Builder {
+            return Builder(
+                targetType,
+                typeElement,
+                classInspector
+            )
         }
     }
 }
@@ -155,12 +169,3 @@ private fun TypeElement.getBindingClassName(): ClassName {
         .replace('.', '$') // since .simpleName is unreliable and sometimes blank
     return ClassName(packageName, "${className}_TaskBinding")
 }
-
-val TypeElement.packageElement: PackageElement
-    get() {
-        var element: Element = this
-        while (element.kind != ElementKind.PACKAGE) {
-            element = element.enclosingElement
-        }
-        return element as PackageElement
-    }
