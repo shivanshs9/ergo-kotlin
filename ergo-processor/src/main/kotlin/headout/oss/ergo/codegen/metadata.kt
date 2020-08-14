@@ -50,7 +50,7 @@ internal fun KotlinProcessingEnvironment.targetType(
         val methods = kotlinApi.funSpecs.map { funSpec ->
             TargetMethod(
                 name = funSpec.name,
-                returnType = funSpec.returnType!!,
+                returnType = funSpec.returnType ?: UNIT,
                 modifiers = funSpec.modifiers,
                 parameters = funSpec.parameters.toTargetParameters()
             )
