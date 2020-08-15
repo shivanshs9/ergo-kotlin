@@ -11,9 +11,9 @@ import java.net.URI
 /**
  * Created by shivanshs9 on 05/06/20.
  */
-val TASKS = listOf("noArg")
+val TASKS = listOf("spring_noArg", "suspend_oneArg")
 val TASK_BODIES = listOf(
-    ""
+    "", "{\"num\": 3}"
 )
 val LOCAL_REGION: Region = Region.of("default")
 val LOCAL_ENDPOINT: URI = URI.create("http://localhost:9324")
@@ -27,16 +27,19 @@ fun CoroutineScope.produceTasks() = launch {
         .region(LOCAL_REGION)
         .build()
 
+    var i = 0
     while (isActive) {
         val taskIndex = TASKS.indices.random()
         val sendMsg = SendMessageRequest.builder()
             .messageGroupId(TASKS[taskIndex])
             .messageBody(TASK_BODIES[taskIndex])
             .queueUrl(QUEUE_URL)
+            .messageDeduplicationId(i.toString())
             .build()
         val id = sqsClient.sendMessage(sendMsg).messageId()
         println("Message sent with id: $id")
         delay((1000L..5000L).random())
+        i++
     }
 }
 
@@ -45,21 +48,21 @@ fun main() = runBlocking {
     springApp.main()
 
     println("${Thread.currentThread().name} Starting program")
-//    val job = produceTasks()
+    val job = produceTasks()
     val sqsClient = SqsAsyncClient.builder()
         .endpointOverride(LOCAL_ENDPOINT)
         .region(LOCAL_REGION)
         .build()
     val service = SqsMsgService(sqsClient, QUEUE_URL, RESULT_QUEUE_URL)
-    val job = service.start()
+    val cronJob = service.start()
     Runtime.getRuntime().addShutdownHook(object : Thread() {
         override fun run() {
             super.run()
             service.stop()
             springApp.stop()
-//            job.cancel()
+            job.cancel()
         }
     })
-    job.join()
+    cronJob.join()
     service.stop()
 }

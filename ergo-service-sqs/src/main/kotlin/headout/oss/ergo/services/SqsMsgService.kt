@@ -4,8 +4,8 @@ import headout.oss.ergo.annotations.TaskId
 import headout.oss.ergo.models.JobId
 import headout.oss.ergo.models.JobResult
 import headout.oss.ergo.models.RequestMsg
+import headout.oss.ergo.utils.asyncSendDelayed
 import headout.oss.ergo.utils.repeatUntilCancelled
-import headout.oss.ergo.utils.sendDelayed
 import headout.oss.ergo.utils.ticker
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.ReceiveChannel
@@ -84,7 +84,7 @@ class SqsMsgService(
                     }
                     pendingJobs.add(requestMsg.jobId)
                     send(requestMsg)
-                    sendDelayed(captures, PingMessageCapture(requestMsg), defaultPingMessageDelay)
+                    asyncSendDelayed(captures, PingMessageCapture(requestMsg), defaultPingMessageDelay)
                 }
             }
         }
@@ -111,7 +111,7 @@ class SqsMsgService(
                             val newTimeout =
                                 getVisibilityTimeoutForAttempt(visibilityTimeout, capture.attempt)
                             changeVisibilityTimeout(capture.request, newTimeout)
-                            sendDelayed(
+                            asyncSendDelayed(
                                 captures,
                                 PingMessageCapture(capture.request, capture.attempt + 1),
                                 defaultPingMessageDelay
