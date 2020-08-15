@@ -1,6 +1,7 @@
 package headout.oss.ergo
 
 import headout.oss.ergo.annotations.Task
+import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 
 /**
@@ -17,8 +18,11 @@ object ExampleTasks {
 }
 
 class InstanceClassTasks {
-    @Task("instance_noArg")
-    fun noArg(): Boolean = true
+    @Task("suspend_oneArg")
+    suspend fun longRunning(num: Int): Int {
+        delay(3000L)
+        return num * num
+    }
 }
 
 @Serializable

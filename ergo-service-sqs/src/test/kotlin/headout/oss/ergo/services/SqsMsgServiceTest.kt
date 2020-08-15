@@ -6,6 +6,7 @@ import headout.oss.ergo.examples.WhyDisKolaveriDi
 import headout.oss.ergo.factory.JsonFactory
 import headout.oss.ergo.models.JobResult
 import headout.oss.ergo.models.JobResultMetadata
+import headout.oss.ergo.models.RequestMsg
 import io.mockk.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -17,6 +18,7 @@ import org.junit.Test
 import software.amazon.awssdk.services.sqs.SqsAsyncClient
 import software.amazon.awssdk.services.sqs.model.*
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.TimeUnit
 import java.util.function.Consumer
 
 /**
@@ -31,7 +33,8 @@ class SqsMsgServiceTest : BaseTest() {
 
     override fun beforeTest() {
         super.beforeTest()
-        msgService = spyk(SqsMsgService(sqsClient, QUEUE_URL, scope = testScope))
+        msgService =
+            spyk(SqsMsgService(sqsClient, QUEUE_URL, defaultVisibilityTimeout = VISIBILITY_TIMEOUT, scope = testScope))
         mockkObject(BaseMsgService.Companion)
         mockCommonSqsClient()
     }
@@ -161,6 +164,30 @@ class SqsMsgServiceTest : BaseTest() {
         coVerify {
             msgService.processRequest(any())
             delay(DELAY_WAIT + 2000)
+        }
+        verify {
+            msgService["handleSuccess"](match<SuccessResultCapture<Message>> {
+                logger.info("result=${it.result}")
+                val metadata = it.result.metadata
+                metadata.status == JobResultMetadata.STATUS.SUCCESS.code
+            })
+        }
+    }
+
+    @Test
+    fun whenTaskValidButResultAfterVisibilityTimeout_VerifyVisibilityTimeoutIncreased() {
+        val taskId = "suspend.long"
+        mockReceiveMessageResponse(taskId = taskId, body = "")
+        msgService.start()
+        coVerify {
+            msgService.processRequest(any())
+            delay(VISIBILITY_TIMEOUT * 1000)
+        }
+        coVerify {
+            msgService["changeVisibilityTimeout"](any<RequestMsg<Message>>(), match<Long> {
+                it > VISIBILITY_TIMEOUT
+            })
+            delay(VISIBILITY_TIMEOUT * 1000)
         }
         verify {
             msgService["handleSuccess"](match<SuccessResultCapture<Message>> {
@@ -304,7 +331,7 @@ class SqsMsgServiceTest : BaseTest() {
                             }
                         }
                         .apply {
-                            body?.let { body(body) }
+                            body?.also { body(it) }
                         }
                         .receiptHandle(receiptHandle)
                         .build()
@@ -323,5 +350,7 @@ class SqsMsgServiceTest : BaseTest() {
     companion object {
         private const val QUEUE_URL = "sqs://queue"
         private const val DELAY_WAIT = 1000L
+
+        private val VISIBILITY_TIMEOUT: Long = TimeUnit.SECONDS.toSeconds(5)
     }
 }

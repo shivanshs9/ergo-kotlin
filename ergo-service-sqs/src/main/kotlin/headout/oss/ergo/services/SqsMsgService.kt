@@ -4,8 +4,8 @@ import headout.oss.ergo.annotations.TaskId
 import headout.oss.ergo.models.JobId
 import headout.oss.ergo.models.JobResult
 import headout.oss.ergo.models.RequestMsg
+import headout.oss.ergo.utils.asyncSendDelayed
 import headout.oss.ergo.utils.repeatUntilCancelled
-import headout.oss.ergo.utils.sendDelayed
 import headout.oss.ergo.utils.ticker
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.ReceiveChannel
@@ -18,6 +18,7 @@ import software.amazon.awssdk.services.sqs.SqsAsyncClient
 import software.amazon.awssdk.services.sqs.model.*
 import java.util.concurrent.TimeUnit
 import kotlin.math.round
+import kotlin.properties.Delegates
 
 /**
  * Created by shivanshs9 on 28/05/20.
@@ -29,10 +30,12 @@ class SqsMsgService(
     private val sqs: SqsAsyncClient,
     private val requestQueueUrl: String,
     private val resultQueueUrl: String = requestQueueUrl,
-    private val defaultVisibilityTimeout: Long = DEFAULT_VISIBILITY_TIMEOUT,
+    private val defaultVisibilityTimeout: Long? = null,
     scope: CoroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 ) : BaseMsgService<Message>(scope) {
-    private val defaultPingMessageDelay: Long by lazy { getPingDelay(defaultVisibilityTimeout) }
+    private var visibilityTimeout by Delegates.notNull<Long>()
+
+    private val defaultPingMessageDelay: Long by lazy { getPingDelay(visibilityTimeout) }
     private val pendingJobs = mutableSetOf<JobId>()
 
     private val timeoutResultCollect = ticker(TIMEOUT_RESULT_COLLECTION)
@@ -46,6 +49,22 @@ class SqsMsgService(
             .build()
     }
 
+    override suspend fun initService() {
+        visibilityTimeout = defaultVisibilityTimeout?.also {
+            logger.info { "Using the visibility timeout of $it seconds" }
+        } ?: sqs.runCatching {
+            logger.info { "Attempting to fetch visibility timeout..." }
+            getVisibilityTimeout(requestQueueUrl).also {
+                logger.info { "Fetched visibility timeout of $it seconds" }
+            }
+        }.getOrElse {
+            logger.warn(it) { "Failed to fetch!!" }
+            DEFAULT_VISIBILITY_TIMEOUT.also {
+                logger.info { "Using default visibility timeout of $it seconds" }
+            }
+        }
+    }
+
     override suspend fun processRequest(request: RequestMsg<Message>): JobResult<*> = try {
         jobController.runJob(request.taskId, request.jobId, request.message.body())
     } finally {
@@ -56,14 +75,16 @@ class SqsMsgService(
         produce(Dispatchers.IO, CAPACITY_REQUEST_BUFFER) {
             repeatUntilCancelled(BaseMsgService.Companion::collectCaughtExceptions) {
                 val messages = sqs.receiveMessage(receiveRequest).await().messages()
-                logger.info { "Received ${messages.size} messages - $messages" }
+                logger.info { "Received ${messages.size} messages" }
                 for (msg in messages) {
                     val groupId = msg.attributes()[MessageSystemAttributeName.MESSAGE_GROUP_ID]
                         ?: error("Message doesn't have 'MessageGroupId' key!")
-                    val requestMsg = RequestMsg(toTaskId(groupId), msg.messageId(), msg)
+                    val requestMsg = RequestMsg(toTaskId(groupId), msg.messageId(), msg).also {
+                        logger.debug { "Received request - $it" }
+                    }
                     pendingJobs.add(requestMsg.jobId)
                     send(requestMsg)
-                    sendDelayed(captures, PingMessageCapture(requestMsg), defaultPingMessageDelay)
+                    asyncSendDelayed(captures, PingMessageCapture(requestMsg), defaultPingMessageDelay)
                 }
             }
         }
@@ -88,9 +109,9 @@ class SqsMsgService(
                         is PingMessageCapture -> if (pendingJobs.contains(capture.request.jobId)) {
                             logger.debug(MARKER_RESULT_BUFFER) { "PING: job '${capture.request.jobId}' still pending (attempt ${capture.attempt})" }
                             val newTimeout =
-                                getVisibilityTimeoutForAttempt(defaultVisibilityTimeout, capture.attempt + 1)
-                            changeVisibilityTimeout(capture.request, newTimeout.toInt())
-                            sendDelayed(
+                                getVisibilityTimeoutForAttempt(visibilityTimeout, capture.attempt)
+                            changeVisibilityTimeout(capture.request, newTimeout)
+                            asyncSendDelayed(
                                 captures,
                                 PingMessageCapture(capture.request, capture.attempt + 1),
                                 defaultPingMessageDelay
@@ -114,7 +135,7 @@ class SqsMsgService(
     private suspend fun handleSuccess(resultCapture: SuccessResultCapture<Message>) =
         deleteMessage(resultCapture.request)
 
-    private suspend fun pushResults(jobResults: List<JobResult<*>>) = launch(currentCoroutineContext()) {
+    private suspend fun pushResults(jobResults: List<JobResult<*>>) = launch(Dispatchers.IO) {
         logger.info { "Pushing ${jobResults.size} results!" }
         val msgEntries = jobResults.mapIndexed { index, jobResult ->
             val msgBody = parseResult(jobResult)
@@ -143,17 +164,17 @@ class SqsMsgService(
         }
     }
 
-    private suspend fun changeVisibilityTimeout(request: RequestMsg<Message>, visibilityTimeout: Int) =
-        launch(currentCoroutineContext()) {
-            logger.info { "Change visibility timeout of message with jobId '${request.jobId}' to $visibilityTimeout" }
+    private suspend fun changeVisibilityTimeout(request: RequestMsg<Message>, visibilityTimeout: Long) =
+        launch(Dispatchers.IO) {
+            logger.info { "Change visibility timeout of message with jobId '${request.jobId}' to $visibilityTimeout seconds" }
             sqs.changeMessageVisibility {
                 it.queueUrl(requestQueueUrl)
                 it.receiptHandle(request.message.receiptHandle())
-                it.visibilityTimeout(visibilityTimeout)
+                it.visibilityTimeout(visibilityTimeout.toInt())
             }.await()
         }
 
-    private suspend fun deleteMessage(request: RequestMsg<Message>) = launch(currentCoroutineContext()) {
+    private suspend fun deleteMessage(request: RequestMsg<Message>) = launch(Dispatchers.IO) {
         logger.info { "Deleting message with jobId - ${request.jobId}" }
         sqs.deleteMessage {
             it.queueUrl(requestQueueUrl)
@@ -164,7 +185,7 @@ class SqsMsgService(
     companion object : TaskServiceConversion {
         const val MAX_BUFFERED_MESSAGES = 10
         private const val MAX_VISIBILITY_TIMEOUT = 43199.toLong()
-        val DEFAULT_VISIBILITY_TIMEOUT = TimeUnit.MINUTES.toSeconds(20)
+        val DEFAULT_VISIBILITY_TIMEOUT = TimeUnit.SECONDS.toSeconds(30)
         val TIMEOUT_RESULT_COLLECTION: Long = TimeUnit.MINUTES.toMillis(2)
 
         private val MARKER_RESULT_BUFFER = MarkerFactory.getMarker("Buffer")

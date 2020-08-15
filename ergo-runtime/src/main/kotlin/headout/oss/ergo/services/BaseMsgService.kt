@@ -29,10 +29,12 @@ abstract class BaseMsgService<T>(
     protected val captures = Channel<MessageCapture<T>>(CAPACITY_CAPTURE_BUFFER)
 
     fun start() = launch {
+        initService()
         val requests = collectRequests()
         immortalWorkers(numWorkers, exceptionHandler = Companion::collectCaughtExceptions) { workerId ->
             for (request in requests) {
                 val result = runCatching {
+                    logger.info { "Processing request - $request" }
                     processRequest(request)
                 }.onFailure { exc ->
                     logger.error(
@@ -75,6 +77,8 @@ abstract class BaseMsgService<T>(
     protected abstract suspend fun collectRequests(): ReceiveChannel<RequestMsg<T>>
 
     protected abstract suspend fun handleCaptures(): Job
+
+    protected abstract suspend fun initService()
 
     protected fun parseResult(result: JobResult<*>) = jobController.parser.serializeJobResult(result)
 

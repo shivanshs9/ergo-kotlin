@@ -26,7 +26,7 @@ suspend fun CoroutineScope.repeatUntilCancelled(exceptionHandler: (Throwable) ->
             exceptionHandler(ex)
         }
     }
-    logger.debug("coroutine on ${currentThread().name} exiting")
+    logger.warn { "coroutine on ${currentThread().name} exiting" }
 }
 
 fun CoroutineScope.workers(
@@ -42,7 +42,11 @@ fun CoroutineScope.immortalWorkers(
     block: suspend CoroutineScope.(workedId: Int) -> Unit
 ) = workers(concurrency, start) { repeatUntilCancelled(exceptionHandler) { block(it) } }
 
-suspend inline fun <reified E> CoroutineScope.sendDelayed(channel: SendChannel<E>, element: E, delay: Long) = launch {
+inline fun <reified E> CoroutineScope.asyncSendDelayed(channel: SendChannel<E>, element: E, delay: Long) = launch {
+    sendDelayed(channel, element, delay)
+}
+
+suspend inline fun <reified E> sendDelayed(channel: SendChannel<E>, element: E, delay: Long) {
     delay(delay)
     channel.send(element)
 }
@@ -56,8 +60,7 @@ fun CoroutineScope.ticker(
     require(delayMillis >= 0) { "Expected non-negative delay, but has $delayMillis ms" }
     require(initialDelayMillis >= 0) { "Expected non-negative initial delay, but has $initialDelayMillis ms" }
     return produce(Dispatchers.Unconfined + context, capacity = 0) {
-        delay(initialDelayMillis)
-        send(Unit)
-        while (isActive) sendDelayed(this, Unit, delayMillis)
+        sendDelayed(channel, Unit, initialDelayMillis)
+        while (isActive) sendDelayed(channel, Unit, delayMillis)
     }
 }

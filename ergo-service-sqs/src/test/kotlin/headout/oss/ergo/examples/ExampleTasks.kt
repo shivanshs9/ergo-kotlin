@@ -18,6 +18,12 @@ object ExampleTasks {
         return request.i * 10
     }
 
+    @Task("suspend.long")
+    suspend fun longRunning(): Int {
+        delay(7500)
+        return 4
+    }
+
     @Task("noArgWithSerializableResult")
     @JvmStatic
     fun noArgWithSerializableResult(): Result =
