@@ -177,7 +177,7 @@ class SqsMsgServiceTest : BaseTest() {
     @Test
     fun whenTaskValidButResultAfterVisibilityTimeout_VerifyVisibilityTimeoutIncreased() {
         val taskId = "suspend.long"
-        mockReceiveMessageResponse(taskId = taskId)
+        mockReceiveMessageResponse(taskId = taskId, body = "")
         msgService.start()
         coVerify {
             msgService.processRequest(any())
@@ -316,7 +316,7 @@ class SqsMsgServiceTest : BaseTest() {
     private fun mockReceiveMessageResponse(
         jobId: String = "jobId",
         taskId: String? = null,
-        body: String = "",
+        body: String? = null,
         receiptHandle: String = "receipt",
         msgCount: Int = 1
     ) {
@@ -331,7 +331,7 @@ class SqsMsgServiceTest : BaseTest() {
                             }
                         }
                         .apply {
-                            body(body)
+                            body?.also { body(it) }
                         }
                         .receiptHandle(receiptHandle)
                         .build()
