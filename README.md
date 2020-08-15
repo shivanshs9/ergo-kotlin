@@ -65,7 +65,7 @@ plugins {
 }
 
 dependencies {
-  kapt("com.github.headout.ergo-kotlin:ergo-processor:1.0.0")
+  kapt("com.github.headout.ergo-kotlin:ergo-processor:1.1.0")
 }
 ```
 
@@ -80,7 +80,7 @@ plugins {
 }
 
 dependencies {
-  kapt "com.github.headout.ergo-kotlin:ergo-processor:1.0.0"
+  kapt "com.github.headout.ergo-kotlin:ergo-processor:1.1.0"
 }
 ```
 
@@ -97,7 +97,7 @@ Add following to Gradle:
 dependencies {
   implementation(platform("software.amazon.awssdk:bom:2.13.26"))
   implementation("software.amazon.awssdk:sqs")
-  implementation("com.github.headout.ergo-kotlin:ergo-service-sqs:1.0.0")
+  implementation("com.github.headout.ergo-kotlin:ergo-service-sqs:1.1.0")
 }
 ```
 
@@ -110,7 +110,7 @@ dependencies {
 dependencies {
   implementation platform("software.amazon.awssdk:bom:2.13.26")
   implementation "software.amazon.awssdk:sqs"
-  implementation "com.github.headout.ergo-kotlin:ergo-service-sqs:1.0.0"
+  implementation "com.github.headout.ergo-kotlin:ergo-service-sqs:1.1.0"
 }
 ```
 
@@ -125,7 +125,7 @@ Add following to Gradle:
 
 ```kotlin
 dependencies {
-  implementation("com.github.headout.ergo-kotlin:ergo-spring:1.0.0")
+  implementation("com.github.headout.ergo-kotlin:ergo-spring:1.1.0")
 }
 ```
 
@@ -136,7 +136,7 @@ dependencies {
 
 ```gradle
 dependencies {
-  implementation "com.github.headout.ergo-kotlin:ergo-spring:1.0.0"
+  implementation "com.github.headout.ergo-kotlin:ergo-spring:1.1.0"
 }
 ```
 

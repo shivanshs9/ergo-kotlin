@@ -1,4 +1,4 @@
-val VERSION_NAME = "1.0.2"
+val VERSION_NAME = "1.1.0"
 
 version = VERSION_NAME
 group = "headout.oss"
