@@ -56,7 +56,12 @@ class TaskMethodGenerator internal constructor(
                 .addParameters(targetMethod.targetParameters.map {
                     ParameterSpec.builder(it.name, it.type)
                         .apply {
-                            it.defaultValue?.let { code -> defaultValue(code) }
+                            if (it.isOptional) {
+                                when {
+                                    it.hasDefault -> defaultValue(it.defaultValue!!)
+                                    else -> defaultValue(CodeBlock.of("null"))
+                                }
+                            }
                         }
                         .build()
                 })

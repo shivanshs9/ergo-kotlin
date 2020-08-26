@@ -12,8 +12,9 @@ abstract class BaseLibraryError(
 ) : BaseJobError(status, error, msg)
 
 class ParseRequestError(
+    requestData: String,
     error: Throwable? = null,
-    msg: String = "Malformed request data, error in deserialization.\n${error?.localizedMessage}"
+    msg: String = "Malformed request data, error in deserialization.\n${error?.localizedMessage}\nRequest data: $requestData"
 ) : BaseLibraryError(STATUS.ERROR_PARSE, error, msg)
 
 class JobCancellationError(

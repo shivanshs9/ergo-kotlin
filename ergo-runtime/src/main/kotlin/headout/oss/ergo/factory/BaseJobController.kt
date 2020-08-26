@@ -19,7 +19,7 @@ abstract class BaseJobController {
     private suspend fun createTaskController(taskId: TaskId, jobId: JobId, rawData: String): BaseTaskController<*, *> {
         val requestData = parser.runCatching { parseRequestData(taskId, rawData) }.getOrElse {
             throw when (it) {
-                is SerializationException -> ParseRequestError(it)
+                is SerializationException -> ParseRequestError(rawData, it)
                 else -> it
             }
         }

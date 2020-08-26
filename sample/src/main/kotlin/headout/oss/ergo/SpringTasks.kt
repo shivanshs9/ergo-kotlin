@@ -11,6 +11,6 @@ import org.springframework.stereotype.Service
 class SpringTasks(
     @Autowired service: SampleService
 ) {
-    @Task("spring_noArg")
-    fun noArg(): Boolean = true
+    @Task("spring_optionalArg")
+    fun optionalArg(num: Int?): Boolean = (num ?: 2) % 2 == 0
 }

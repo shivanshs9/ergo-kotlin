@@ -11,9 +11,9 @@ import java.net.URI
 /**
  * Created by shivanshs9 on 05/06/20.
  */
-val TASKS = listOf("spring_noArg", "suspend_oneArg")
+val TASKS = listOf("spring_optionalArg", "suspend_oneArg")
 val TASK_BODIES = listOf(
-    "", "{\"num\": 3}"
+    "{}", "{\"num\": 3}"
 )
 val LOCAL_REGION: Region = Region.of("default")
 val LOCAL_ENDPOINT: URI = URI.create("http://localhost:9324")
@@ -32,7 +32,7 @@ fun CoroutineScope.produceTasks() = launch {
         val taskIndex = TASKS.indices.random()
         val sendMsg = SendMessageRequest.builder()
             .messageGroupId(TASKS[taskIndex])
-            .messageBody(TASK_BODIES[taskIndex])
+            .messageBody(TASK_BODIES.random())
             .queueUrl(QUEUE_URL)
             .messageDeduplicationId(i.toString())
             .build()
