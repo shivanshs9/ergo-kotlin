@@ -2,6 +2,7 @@ package headout.oss.ergo.models
 
 import headout.oss.ergo.annotations.TaskId
 import headout.oss.ergo.exceptions.BaseJobError
+import headout.oss.ergo.exceptions.ExceptionUtils.getStackTraceWithCause
 import kotlinx.serialization.Serializable
 
 /**
@@ -40,7 +41,7 @@ data class JobResultMetadata internal constructor(
         fun success() = JobResultMetadata(STATUS.SUCCESS.code, null)
         fun <T : BaseJobError> error(error: T) = JobResultMetadata(
             error.status.code,
-            ErrorMetadata(error.message ?: error.localizedMessage, error.stackTrace.joinToString("\n"))
+            ErrorMetadata(error.message ?: error.localizedMessage, error.getStackTraceWithCause())
         )
     }
 }

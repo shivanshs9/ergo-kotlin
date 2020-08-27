@@ -23,5 +23,5 @@ class TaskNotFoundError(
 
 class ClientInternalError(
     error: Throwable,
-    msg: String = "Faced unknown error in client logic"
+    msg: String = "Faced unknown error in client logic.\n${error.localizedMessage ?: error.message}"
 ) : BaseClientError(STATUS.ERROR_CLIENT_INTERNAL, error, msg)
