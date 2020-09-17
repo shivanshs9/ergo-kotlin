@@ -27,7 +27,8 @@ abstract class BaseJobController {
     }
 
     suspend fun runJob(taskId: TaskId, jobId: JobId, rawData: String): JobResult<*> =
-        withContext(Dispatchers.Unconfined) {
+        withContext(Dispatchers.Default) {
+            // assuming the target function is CPU-intensive
             val controller = createTaskController(taskId, jobId, rawData)
             controller.execute()
         }
