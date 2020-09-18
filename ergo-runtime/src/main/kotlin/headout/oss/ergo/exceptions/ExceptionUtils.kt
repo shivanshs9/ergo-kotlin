@@ -13,12 +13,14 @@ object ExceptionUtils {
     // Called by client on error
     fun processClientError(error: Throwable): BaseJobError = when (error) {
         is CancellationException -> JobCancellationError(error)
+        is BaseClientError -> error
         else -> ClientInternalError(error)
     }
 
     // Called by library on error
     fun processLibraryError(error: Throwable): BaseLibraryError = when (error) {
         is CancellationException -> JobCancellationError(error)
+        is BaseLibraryError -> error
         else -> LibraryInternalError(error)
     }
 

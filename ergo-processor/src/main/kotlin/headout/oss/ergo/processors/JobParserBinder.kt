@@ -124,7 +124,14 @@ class JobParserBinder(
                     endControlFlow()
                 }
             }
-            addStatement("else -> error(%S)", "Task ID unknown")
+            beginControlFlow("else ->")
+            addStatement(
+                "val serializer = %T.serializer(%M())",
+                jobResultClass,
+                BUILTIN_SERIALIZERS.getValue(Unit::class.asClassName())
+            )
+            addStatement("%M.stringify(serializer, %N as JobResult<Unit>)", jsonRef, "jobResult")
+            endControlFlow()
         }
         .endControlFlow()
         .build()

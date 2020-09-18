@@ -20,7 +20,7 @@ data class JobResult<out T>(
             JobResult(taskId, jobId, data, JobResultMetadata.success())
 
         fun error(taskId: TaskId, jobId: JobId, error: BaseJobError) =
-            JobResult<Any>(taskId, jobId, metadata = JobResultMetadata.error(error))
+            JobResult<Unit>(taskId, jobId, metadata = JobResultMetadata.error(error))
     }
 }
 
