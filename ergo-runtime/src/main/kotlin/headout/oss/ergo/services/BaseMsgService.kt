@@ -34,8 +34,13 @@ abstract class BaseMsgService<T>(
         immortalWorkers(numWorkers, exceptionHandler = Companion::collectCaughtExceptions) { workerId ->
             for (request in requests) {
                 val result = runCatching {
-                    logger.info { "Processing request - $request" }
-                    processRequest(request)
+                    if (shouldProcessRequest(request)) {
+                        logger.info { "Processing request - $request" }
+                        processRequest(request)
+                    } else {
+                        logger.info { "SKIP request - $request" }
+                        null
+                    }
                 }.onFailure { exc ->
                     logger.error(
                         "Worker '$workerId' on '${currentThread().name}' caught exception trying to process message '${request.jobId}'",
@@ -60,17 +65,21 @@ abstract class BaseMsgService<T>(
                         error
                     )
                 }
-                captures.send(
-                    if (result.isError) ErrorResultCapture(request, result)
-                    else SuccessResultCapture(request, result)
-                )
-                captures.send(RespondResultCapture(request, result))
+                if (result != null) {
+                    captures.send(
+                        if (result.isError) ErrorResultCapture(request, result)
+                        else SuccessResultCapture(request, result)
+                    )
+                    captures.send(RespondResultCapture(request, result))
+                }
             }
         }
         handleCaptures()
     }
 
     fun stop() = cancel()
+
+    protected open fun shouldProcessRequest(request: RequestMsg<T>): Boolean = true
 
     abstract suspend fun processRequest(request: RequestMsg<T>): JobResult<*>
 

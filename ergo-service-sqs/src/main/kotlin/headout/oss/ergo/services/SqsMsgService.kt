@@ -16,6 +16,7 @@ import mu.KotlinLogging
 import org.slf4j.MarkerFactory
 import software.amazon.awssdk.services.sqs.SqsAsyncClient
 import software.amazon.awssdk.services.sqs.model.*
+import java.util.*
 import java.util.concurrent.TimeUnit
 import kotlin.math.round
 import kotlin.properties.Delegates
@@ -31,8 +32,9 @@ class SqsMsgService(
     private val requestQueueUrl: String,
     private val resultQueueUrl: String = requestQueueUrl,
     private val defaultVisibilityTimeout: Long? = null,
-    scope: CoroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-) : BaseMsgService<Message>(scope) {
+    scope: CoroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob()),
+    numWorkers: Int = DEFAULT_NUMBER_WORKERS
+) : BaseMsgService<Message>(scope, numWorkers) {
     private var visibilityTimeout by Delegates.notNull<Long>()
 
     private val defaultPingMessageDelay: Long by lazy { getPingDelay(visibilityTimeout) }
@@ -66,24 +68,34 @@ class SqsMsgService(
     }
 
     override suspend fun processRequest(request: RequestMsg<Message>): JobResult<*> = try {
+        pendingJobs.add(request.jobId)
         jobController.runJob(request.taskId, request.jobId, request.message.body())
     } finally {
         pendingJobs.remove(request.jobId)
+    }
+
+    /*
+    Should attempt to process request only if it hasn't been pinged yet.
+    If it has already been pinged and request is processed later, then visibility timeout
+    won't ever increase, thus risking more than 1 consumer processing the task.
+     */
+    override fun shouldProcessRequest(request: RequestMsg<Message>): Boolean {
+        val diffInMillis = Date().time - request.receiveTimestamp.time
+        return diffInMillis <= defaultPingMessageDelay
     }
 
     override suspend fun collectRequests(): ReceiveChannel<RequestMsg<Message>> =
         produce(Dispatchers.IO, CAPACITY_REQUEST_BUFFER) {
             repeatUntilCancelled(BaseMsgService.Companion::collectCaughtExceptions) {
                 val messages = sqs.receiveMessage(receiveRequest).await().messages()
-//                val cleanLog: (() -> String) -> Unit = if (messages.isNotEmpty()) logger::info else logger::debug
-                logger.info { "Received ${messages.size} messages" }
+                val cleanLog: (() -> String) -> Unit = if (messages.isNotEmpty()) logger::info else logger::debug
+                cleanLog { "Received ${messages.size} messages" }
                 for (msg in messages) {
                     val groupId = msg.attributes()[MessageSystemAttributeName.MESSAGE_GROUP_ID]
                         ?: error("Message doesn't have 'MessageGroupId' key!")
                     val requestMsg = RequestMsg(toTaskId(groupId), msg.messageId(), msg).also {
                         logger.debug { "Received request - $it" }
                     }
-                    pendingJobs.add(requestMsg.jobId)
                     send(requestMsg)
                     asyncSendDelayed(captures, PingMessageCapture(requestMsg), defaultPingMessageDelay)
                 }
@@ -95,7 +107,7 @@ class SqsMsgService(
         repeatUntilCancelled(BaseMsgService.Companion::collectCaughtExceptions) {
             select {
                 captures.onReceive { capture ->
-                    logger.info("event: '${capture::class.simpleName}', request: '${capture.request}'")
+                    logger.info { "event: '${capture::class.simpleName}', request: '${capture.request}'" }
                     when (capture) {
                         is ErrorResultCapture -> handleError(capture)
                         is SuccessResultCapture -> handleSuccess(capture)
