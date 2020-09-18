@@ -32,8 +32,8 @@ class SqsMsgService(
     private val requestQueueUrl: String,
     private val resultQueueUrl: String = requestQueueUrl,
     private val defaultVisibilityTimeout: Long? = null,
-    scope: CoroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob()),
-    numWorkers: Int = DEFAULT_NUMBER_WORKERS
+    numWorkers: Int = DEFAULT_NUMBER_WORKERS,
+    scope: CoroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 ) : BaseMsgService<Message>(scope, numWorkers) {
     private var visibilityTimeout by Delegates.notNull<Long>()
 
@@ -74,11 +74,11 @@ class SqsMsgService(
         pendingJobs.remove(request.jobId)
     }
 
-    /*
-    Should attempt to process request only if it hasn't been pinged yet.
-    If it has already been pinged and request is processed later, then visibility timeout
-    won't ever increase, thus risking more than 1 consumer processing the task.
-     */
+    /**
+     * Should attempt to process request only if it hasn't been pinged yet.
+     * If it has already been pinged and request is processed later, then visibility timeout
+     * won't ever increase, thus risking more than 1 consumer processing the task.
+     **/
     override fun shouldProcessRequest(request: RequestMsg<Message>): Boolean {
         val diffInMillis = Date().time - request.receiveTimestamp.time
         return diffInMillis <= defaultPingMessageDelay

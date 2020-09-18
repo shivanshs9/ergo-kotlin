@@ -79,6 +79,9 @@ abstract class BaseMsgService<T>(
 
     fun stop() = cancel()
 
+    /**
+     * Should process the given request message otherwise skip if returned false
+     */
     protected open fun shouldProcessRequest(request: RequestMsg<T>): Boolean = true
 
     abstract suspend fun processRequest(request: RequestMsg<T>): JobResult<*>
