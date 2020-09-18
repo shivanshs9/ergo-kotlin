@@ -97,7 +97,7 @@ class SqsMsgService(
                         logger.debug { "Received request - $it" }
                     }
                     send(requestMsg)
-                    asyncSendDelayed(captures, PingMessageCapture(requestMsg), defaultPingMessageDelay)
+                    asyncSendDelayed(captures, PingMessageCapture(requestMsg), defaultPingMessageDelay, Dispatchers.IO)
                 }
             }
         }
@@ -127,7 +127,8 @@ class SqsMsgService(
                             asyncSendDelayed(
                                 captures,
                                 PingMessageCapture(capture.request, capture.attempt + 1),
-                                defaultPingMessageDelay
+                                defaultPingMessageDelay,
+                                Dispatchers.IO
                             )
                         } else logger.debug(MARKER_RESULT_BUFFER) { "PING: jobs - $pendingJobs" }
                     }

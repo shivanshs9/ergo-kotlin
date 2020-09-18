@@ -42,7 +42,12 @@ fun CoroutineScope.immortalWorkers(
     block: suspend CoroutineScope.(workedId: Int) -> Unit
 ) = workers(concurrency, start) { repeatUntilCancelled(exceptionHandler) { block(it) } }
 
-inline fun <reified E> CoroutineScope.asyncSendDelayed(channel: SendChannel<E>, element: E, delay: Long) = launch {
+inline fun <reified E> CoroutineScope.asyncSendDelayed(
+    channel: SendChannel<E>,
+    element: E,
+    delay: Long,
+    context: CoroutineContext
+) = launch(context) {
     sendDelayed(channel, element, delay)
 }
 
