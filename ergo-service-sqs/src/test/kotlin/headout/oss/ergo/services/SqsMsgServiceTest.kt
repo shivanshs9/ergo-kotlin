@@ -198,27 +198,6 @@ class SqsMsgServiceTest : BaseTest() {
         }
     }
 
-    @ImplicitReflectionSerializer
-    @Test
-    fun whenTaskRequestValidAndSuspendingTaskButJobTerminated_VerifyErrorResult() {
-        val taskId = "suspend.2"
-        val body = JsonFactory.json.stringify(mapOf("request" to WhyDisKolaveriDi(3)))
-        mockReceiveMessageResponse(taskId = taskId, body = body)
-        msgService.start()
-        coVerify {
-            msgService.processRequest(any())
-            delay(DELAY_WAIT)
-        }
-        msgService.stop()
-        verify {
-            msgService["handleError"](match<ErrorResultCapture<Message>> {
-                logger.info("result=${it.result}")
-                val metadata = it.result.metadata
-                metadata.status == JobResultMetadata.STATUS.ERROR_LIBRARY_JOB_CANCELLED.code
-            })
-        }
-    }
-
     @Test
     fun whenWorkerEncounteredErrorAndBufferResultsToMax_PushToResultQueue() {
         val msgCount = SqsMsgService.MAX_BUFFERED_MESSAGES
