@@ -6,6 +6,7 @@ import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.channels.produce
 import mu.KotlinLogging
 import java.lang.Thread.currentThread
+import java.util.concurrent.Executors
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 
@@ -32,15 +33,19 @@ suspend fun CoroutineScope.repeatUntilCancelled(exceptionHandler: (Throwable) ->
 fun CoroutineScope.workers(
     concurrency: Int,
     start: CoroutineStart = CoroutineStart.DEFAULT,
+    context: CoroutineContext,
     block: suspend CoroutineScope.(workedId: Int) -> Unit
-) = (1..concurrency).map { launch(start = start) { block(it) } }
+) = (1..concurrency).map { launch(context, start = start) { block(it) } }
 
 fun CoroutineScope.immortalWorkers(
     concurrency: Int,
     start: CoroutineStart = CoroutineStart.DEFAULT,
     exceptionHandler: (Throwable) -> Unit = {},
     block: suspend CoroutineScope.(workedId: Int) -> Unit
-) = workers(concurrency, start) { repeatUntilCancelled(exceptionHandler) { block(it) } }
+): Collection<Job> {
+    val dispatcher = Executors.newFixedThreadPool(concurrency).asCoroutineDispatcher()
+    return workers(concurrency, start, dispatcher) { repeatUntilCancelled(exceptionHandler) { block(it) } }
+}
 
 inline fun <reified E> CoroutineScope.asyncSendDelayed(
     channel: SendChannel<E>,
