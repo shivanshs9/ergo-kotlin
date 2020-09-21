@@ -4,6 +4,7 @@ import com.google.common.truth.Truth.assertThat
 import headout.oss.ergo.BaseTest
 import headout.oss.ergo.examples.WhyDisKolaveriDi
 import headout.oss.ergo.factory.JsonFactory
+import headout.oss.ergo.helpers.InMemoryBufferJobResultHandler
 import headout.oss.ergo.models.JobResult
 import headout.oss.ergo.models.JobResultMetadata
 import headout.oss.ergo.models.RequestMsg
@@ -27,7 +28,7 @@ import java.util.function.Consumer
 private val logger = KotlinLogging.logger {}
 
 @ExperimentalCoroutinesApi
-class SqsMsgServiceTest : BaseTest() {
+class SqsMsgServiceWithBufferedResultsTest : BaseTest() {
     private val sqsClient: SqsAsyncClient = mockk(relaxed = true)
     private lateinit var msgService: SqsMsgService
 
@@ -223,7 +224,7 @@ class SqsMsgServiceTest : BaseTest() {
         msgService.start()
         coVerify {
             msgService.processRequest(any())
-            delay(SqsMsgService.TIMEOUT_RESULT_COLLECTION) // time consuming since timeout value is 2 minutes
+            delay(InMemoryBufferJobResultHandler.TIMEOUT_RESULT_COLLECTION) // time consuming since timeout value is 2 minutes
             msgService["pushResults"](match<List<JobResult<*>>> {
                 it.size == msgCount
             })
@@ -255,7 +256,7 @@ class SqsMsgServiceTest : BaseTest() {
         msgService.start()
         coVerify {
             msgService.processRequest(any())
-            delay(SqsMsgService.TIMEOUT_RESULT_COLLECTION) // time consuming since timeout value is 2 minutes
+            delay(InMemoryBufferJobResultHandler.TIMEOUT_RESULT_COLLECTION) // time consuming since timeout value is 2 minutes
             msgService["pushResults"](match<List<JobResult<*>>> {
                 it.size == msgCount
             })
@@ -320,7 +321,7 @@ class SqsMsgServiceTest : BaseTest() {
         every { sqsClient.receiveMessage(any<ReceiveMessageRequest>()) } returnsMany listOf<CompletableFuture<ReceiveMessageResponse>>(
             CompletableFuture.completedFuture(response),
             CompletableFuture.supplyAsync {
-                Thread.sleep(SqsMsgService.TIMEOUT_RESULT_COLLECTION * 2) // to ensure the error happens only after results are pushed
+                Thread.sleep(InMemoryBufferJobResultHandler.TIMEOUT_RESULT_COLLECTION * 2) // to ensure the error happens only after results are pushed
                 error("Dummy error to mark failure on receiving messages")
             }
         )
