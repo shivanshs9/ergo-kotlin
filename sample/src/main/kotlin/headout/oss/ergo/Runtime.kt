@@ -1,5 +1,6 @@
 package headout.oss.ergo
 
+import headout.oss.ergo.helpers.ImmediateRespondJobResultHandler
 import headout.oss.ergo.services.SqsMsgService
 import kotlinx.coroutines.*
 import software.amazon.awssdk.regions.Region
@@ -53,7 +54,13 @@ fun main() = runBlocking {
         .endpointOverride(LOCAL_ENDPOINT)
         .region(LOCAL_REGION)
         .build()
-    val service = SqsMsgService(sqsClient, QUEUE_URL, RESULT_QUEUE_URL)
+    val service = SqsMsgService(
+        sqsClient,
+        QUEUE_URL,
+        RESULT_QUEUE_URL,
+        numWorkers = 20,
+        resultHandler = ImmediateRespondJobResultHandler()
+    )
     val cronJob = service.start()
     Runtime.getRuntime().addShutdownHook(object : Thread() {
         override fun run() {
