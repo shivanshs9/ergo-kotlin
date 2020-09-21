@@ -20,3 +20,7 @@ fun PluginDependenciesSpec.kotlinKapt() {
 fun PluginDependenciesSpec.kotlinxSerialization() {
     kotlin("plugin.serialization") version kotlinVersion
 }
+
+fun PluginDependenciesSpec.kotlinDoc() {
+    id("org.jetbrains.dokka")
+}

@@ -4,7 +4,7 @@ import publish.GithubPackage
 plugins {
     kotlinJvm()
     kotlinKapt()
-    kotlinxSerialization()
+    kotlinDoc()
 }
 
 kapt {

@@ -8,3 +8,10 @@ include(
     "ergo-spring",
     "sample"
 )
+
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        jcenter()
+    }
+}
