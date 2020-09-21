@@ -22,12 +22,23 @@ import java.lang.Thread.currentThread
  */
 private val logger = KotlinLogging.logger {}
 
+/**
+ * Defines common logic for Ergo Message Service and declares required implementation
+ *
+ * On service start, launches [numWorkers] immortal workers which will eventually pick up and execute tasks
+ * The worker coroutines uses a fixed thread pool of [numWorkers] threads as their dispatcher
+ *
+ * @param numWorkers number of child workers to launch to process the tasks (default is 8)
+ */
 abstract class BaseMsgService<T>(
     scope: CoroutineScope,
     private val numWorkers: Int = DEFAULT_NUMBER_WORKERS
 ) : CoroutineScope by scope {
     protected val captures = Channel<MessageCapture<T>>(CAPACITY_CAPTURE_BUFFER)
 
+    /**
+     * Starts the service in a new launcher coroutine
+     */
     fun start() = launch {
         initService()
         val requests = collectRequests()
@@ -77,6 +88,9 @@ abstract class BaseMsgService<T>(
         handleCaptures()
     }
 
+    /**
+     * Stops the service by cancelling all child coroutines
+     */
     fun stop() = cancel()
 
     /**
@@ -84,12 +98,20 @@ abstract class BaseMsgService<T>(
      */
     protected open fun shouldProcessRequest(request: RequestMsg<T>): Boolean = true
 
+    /**
+     * Process the request message and returns the executed job result
+     */
     abstract suspend fun processRequest(request: RequestMsg<T>): JobResult<*>
 
     protected abstract suspend fun collectRequests(): ReceiveChannel<RequestMsg<T>>
 
     protected abstract suspend fun handleCaptures(): Job
 
+    /**
+     * Initializes the service.
+     *
+     * Needs to be implemented by concrete implementations
+     */
     protected abstract suspend fun initService()
 
     protected fun parseResult(result: JobResult<*>) = jobController.parser.serializeJobResult(result)

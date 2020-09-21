@@ -26,6 +26,26 @@ import kotlin.properties.Delegates
  */
 private val logger = KotlinLogging.logger {}
 
+/**
+ * Implements Ergo Message Service for SQS FIFO Queues.
+ *
+ * The service collect task requests from [requestQueueUrl] and pushes the executed job results to [resultQueueUrl]
+ * When the workers eventually picks up the task to process, it adds it to [pendingJobs] ensuring the request
+ * message's visibility timeout is increased till it's finally finished/errored. At this point, the message is deleted
+ * from the [requestQueueUrl] and the job result is handled by the [resultHandler] which finally decides when to push the
+ * result message
+ *
+ * @param sqs sqs client to use to communicate with [requestQueueUrl] and [resultQueueUrl]
+ * @param requestQueueUrl FIFO queue URL used to pick up messages as task requests. Messages in this queue must have a
+ * "MessageGroupId" and it must be the same as "TaskId"
+ * @param resultQueueUrl FIFO queue URL used to push the job results
+ * @param defaultVisibilityTimeout visibility timeout (in seconds) assumed for the [requestQueueUrl]. If not provided (or passed null),
+ * then it fetches the visibility timeout from the queue attributes of [requestQueueUrl]. If it even fails to fetch, default
+ * is assumed to be 30 seconds.
+ * @param numWorkers number of child workers to launch to process the tasks (default is 8)
+ * @param resultHandler job result handler. Default is an in-memory buffered implementation
+ * @param scope coroutine scope of all child coroutines. Default is IO Dispatcher
+ */
 @ExperimentalCoroutinesApi
 class SqsMsgService(
     private val sqs: SqsAsyncClient,
@@ -41,6 +61,10 @@ class SqsMsgService(
     private val defaultPingMessageDelay: Long by lazy { getPingDelay(visibilityTimeout) }
     private val pendingJobs = mutableSetOf<JobId>()
 
+    /**
+     * Called on service startup, it initializes required properties like
+     * result handler and visibility timeout of the request queue.
+     */
     override suspend fun initService() {
         resultHandler.init(this) { pushResults(it) }
         visibilityTimeout = defaultVisibilityTimeout?.also {
