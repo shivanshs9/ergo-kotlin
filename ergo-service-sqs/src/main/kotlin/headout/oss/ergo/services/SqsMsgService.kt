@@ -1,17 +1,17 @@
 package headout.oss.ergo.services
 
 import headout.oss.ergo.annotations.TaskId
+import headout.oss.ergo.helpers.InMemoryBufferJobResultHandler
+import headout.oss.ergo.helpers.JobResultHandler
 import headout.oss.ergo.models.JobId
 import headout.oss.ergo.models.JobResult
 import headout.oss.ergo.models.RequestMsg
 import headout.oss.ergo.utils.asyncSendDelayed
 import headout.oss.ergo.utils.repeatUntilCancelled
-import headout.oss.ergo.utils.ticker
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.produce
 import kotlinx.coroutines.future.await
-import kotlinx.coroutines.selects.select
 import mu.KotlinLogging
 import org.slf4j.MarkerFactory
 import software.amazon.awssdk.services.sqs.SqsAsyncClient
@@ -33,6 +33,7 @@ class SqsMsgService(
     private val resultQueueUrl: String = requestQueueUrl,
     private val defaultVisibilityTimeout: Long? = null,
     numWorkers: Int = DEFAULT_NUMBER_WORKERS,
+    private val resultHandler: JobResultHandler = InMemoryBufferJobResultHandler(MAX_BUFFERED_MESSAGES),
     scope: CoroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 ) : BaseMsgService<Message>(scope, numWorkers) {
     private var visibilityTimeout by Delegates.notNull<Long>()
@@ -40,18 +41,8 @@ class SqsMsgService(
     private val defaultPingMessageDelay: Long by lazy { getPingDelay(visibilityTimeout) }
     private val pendingJobs = mutableSetOf<JobId>()
 
-    private val timeoutResultCollect = ticker(TIMEOUT_RESULT_COLLECTION)
-
-    private val receiveRequest by lazy {
-        ReceiveMessageRequest.builder()
-            .attributeNamesWithStrings(MessageSystemAttributeName.MESSAGE_GROUP_ID.toString())
-            .queueUrl(requestQueueUrl)
-            .maxNumberOfMessages(MAX_BUFFERED_MESSAGES)
-            .waitTimeSeconds(20)
-            .build()
-    }
-
     override suspend fun initService() {
+        resultHandler.init(this) { pushResults(it) }
         visibilityTimeout = defaultVisibilityTimeout?.also {
             logger.info { "Using the visibility timeout of $it seconds" }
         } ?: sqs.runCatching {
@@ -86,6 +77,13 @@ class SqsMsgService(
 
     override suspend fun collectRequests(): ReceiveChannel<RequestMsg<Message>> =
         produce(Dispatchers.IO, CAPACITY_REQUEST_BUFFER) {
+            val receiveRequest = ReceiveMessageRequest.builder()
+                .attributeNamesWithStrings(MessageSystemAttributeName.MESSAGE_GROUP_ID.toString())
+                .queueUrl(requestQueueUrl)
+                .maxNumberOfMessages(MAX_BUFFERED_MESSAGES)
+                .waitTimeSeconds(20)
+                .build()
+
             repeatUntilCancelled(BaseMsgService.Companion::collectCaughtExceptions) {
                 val messages = sqs.receiveMessage(receiveRequest).await().messages()
                 val cleanLog: (() -> String) -> Unit = if (messages.isNotEmpty()) logger::info else logger::debug
@@ -103,42 +101,25 @@ class SqsMsgService(
         }
 
     override suspend fun handleCaptures(): Job = launch(Dispatchers.IO) {
-        val bufferedResults = mutableListOf<JobResult<*>>()
         repeatUntilCancelled(BaseMsgService.Companion::collectCaughtExceptions) {
-            select {
-                captures.onReceive { capture ->
-                    logger.info { "event: '${capture::class.simpleName}', request: '${capture.request}'" }
-                    when (capture) {
-                        is ErrorResultCapture -> handleError(capture)
-                        is SuccessResultCapture -> handleSuccess(capture)
-                        is RespondResultCapture -> {
-                            bufferedResults.add(capture.result)
-                            logger.debug(MARKER_RESULT_BUFFER) { "Added result of job '${capture.result.jobId}' to buffer (size = ${bufferedResults.size})" }
-                            if (bufferedResults.size == MAX_BUFFERED_MESSAGES) {
-                                pushResults(bufferedResults.toList())
-                                bufferedResults.clear()
-                            }
-                        }
-                        is PingMessageCapture -> if (pendingJobs.contains(capture.request.jobId)) {
-                            logger.debug(MARKER_RESULT_BUFFER) { "PING: job '${capture.request.jobId}' still pending (attempt ${capture.attempt})" }
-                            val newTimeout =
-                                getVisibilityTimeoutForAttempt(visibilityTimeout, capture.attempt)
-                            changeVisibilityTimeout(capture.request, newTimeout)
-                            asyncSendDelayed(
-                                captures,
-                                PingMessageCapture(capture.request, capture.attempt + 1),
-                                defaultPingMessageDelay,
-                                Dispatchers.IO
-                            )
-                        } else logger.debug(MARKER_RESULT_BUFFER) { "PING: jobs - $pendingJobs" }
-                    }
-                }
-                timeoutResultCollect.onReceive {
-                    if (bufferedResults.isNotEmpty()) {
-                        logger.debug(MARKER_RESULT_BUFFER, "TIMEOUT: Result Collect!")
-                        pushResults(bufferedResults.toList())
-                        bufferedResults.clear()
-                    }
+            for (capture in captures) {
+                logger.info { "event: '${capture::class.simpleName}', request: '${capture.request}'" }
+                when (capture) {
+                    is ErrorResultCapture -> handleError(capture)
+                    is SuccessResultCapture -> handleSuccess(capture)
+                    is RespondResultCapture -> resultHandler.handleResult(capture.result)
+                    is PingMessageCapture -> if (pendingJobs.contains(capture.request.jobId)) {
+                        logger.debug(MARKER_JOB_BUFFER) { "PING: job '${capture.request.jobId}' still pending (attempt ${capture.attempt})" }
+                        val newTimeout =
+                            getVisibilityTimeoutForAttempt(visibilityTimeout, capture.attempt)
+                        changeVisibilityTimeout(capture.request, newTimeout)
+                        asyncSendDelayed(
+                            captures,
+                            PingMessageCapture(capture.request, capture.attempt + 1),
+                            defaultPingMessageDelay,
+                            Dispatchers.IO
+                        )
+                    } else logger.debug(MARKER_JOB_BUFFER) { "PING: jobs - $pendingJobs" }
                 }
             }
         }
@@ -200,9 +181,8 @@ class SqsMsgService(
         const val MAX_BUFFERED_MESSAGES = 10
         private const val MAX_VISIBILITY_TIMEOUT = 43199.toLong()
         val DEFAULT_VISIBILITY_TIMEOUT = TimeUnit.SECONDS.toSeconds(30)
-        val TIMEOUT_RESULT_COLLECTION: Long = TimeUnit.MINUTES.toMillis(2)
 
-        private val MARKER_RESULT_BUFFER = MarkerFactory.getMarker("Buffer")
+        private val MARKER_JOB_BUFFER = MarkerFactory.getMarker("PendingJob")
 
         override fun toTaskId(value: String): TaskId = value
 
