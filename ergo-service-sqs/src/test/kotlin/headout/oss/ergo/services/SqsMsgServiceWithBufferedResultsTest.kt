@@ -1,13 +1,14 @@
 package headout.oss.ergo.services
 
 import com.google.common.truth.Truth.assertThat
-import headout.oss.ergo.BaseTest
 import headout.oss.ergo.examples.WhyDisKolaveriDi
 import headout.oss.ergo.factory.JsonFactory
+import headout.oss.ergo.helpers.InMemoryBufferJobResultHandler
 import headout.oss.ergo.models.JobResult
 import headout.oss.ergo.models.JobResultMetadata
 import headout.oss.ergo.models.RequestMsg
-import io.mockk.*
+import io.mockk.coVerify
+import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -15,11 +16,9 @@ import kotlinx.serialization.ImplicitReflectionSerializer
 import kotlinx.serialization.stringify
 import mu.KotlinLogging
 import org.junit.Test
-import software.amazon.awssdk.services.sqs.SqsAsyncClient
-import software.amazon.awssdk.services.sqs.model.*
-import java.util.concurrent.CompletableFuture
-import java.util.concurrent.TimeUnit
-import java.util.function.Consumer
+import software.amazon.awssdk.services.sqs.model.DeleteMessageRequest
+import software.amazon.awssdk.services.sqs.model.Message
+import software.amazon.awssdk.services.sqs.model.SendMessageBatchRequest
 
 /**
  * Created by shivanshs9 on 02/06/20.
@@ -27,22 +26,9 @@ import java.util.function.Consumer
 private val logger = KotlinLogging.logger {}
 
 @ExperimentalCoroutinesApi
-class SqsMsgServiceTest : BaseTest() {
-    private val sqsClient: SqsAsyncClient = mockk(relaxed = true)
-    private lateinit var msgService: SqsMsgService
-
-    override fun beforeTest() {
-        super.beforeTest()
-        msgService =
-            spyk(SqsMsgService(sqsClient, QUEUE_URL, defaultVisibilityTimeout = VISIBILITY_TIMEOUT, scope = testScope))
-        mockkObject(BaseMsgService.Companion)
-        mockCommonSqsClient()
-    }
-
-    override fun afterTest() {
-        super.afterTest()
-        msgService.stop()
-    }
+class SqsMsgServiceWithBufferedResultsTest : BaseSqsServiceTest() {
+    override fun createSqsMsgService(): SqsMsgService =
+        SqsMsgService(sqsClient, QUEUE_URL, defaultVisibilityTimeout = VISIBILITY_TIMEOUT, scope = testScope)
 
     @Test
     fun sufficientWorkersLaunchedOnStart() {
@@ -51,11 +37,13 @@ class SqsMsgServiceTest : BaseTest() {
             assertThat(children.count()).isEqualTo(workersCount)
         }
         val countLauncher = 1
-        val countChannels = 2
+        val countChannels = 1
         val countWorkerSupervisor = 1
+        // using buffer result handler by default
+        val countBufferResultTimeoutTicker = 2
         assertThat(
             msgService.coroutineContext[Job]?.children?.count() ?: 0
-        ).isEqualTo(countChannels + countLauncher + countWorkerSupervisor)
+        ).isEqualTo(countChannels + countLauncher + countWorkerSupervisor + countBufferResultTimeoutTicker)
     }
 
     @Test
@@ -223,7 +211,7 @@ class SqsMsgServiceTest : BaseTest() {
         msgService.start()
         coVerify {
             msgService.processRequest(any())
-            delay(SqsMsgService.TIMEOUT_RESULT_COLLECTION) // time consuming since timeout value is 2 minutes
+            delay(InMemoryBufferJobResultHandler.TIMEOUT_RESULT_COLLECTION) // time consuming since timeout value is 2 minutes
             msgService["pushResults"](match<List<JobResult<*>>> {
                 it.size == msgCount
             })
@@ -255,7 +243,7 @@ class SqsMsgServiceTest : BaseTest() {
         msgService.start()
         coVerify {
             msgService.processRequest(any())
-            delay(SqsMsgService.TIMEOUT_RESULT_COLLECTION) // time consuming since timeout value is 2 minutes
+            delay(InMemoryBufferJobResultHandler.TIMEOUT_RESULT_COLLECTION) // time consuming since timeout value is 2 minutes
             msgService["pushResults"](match<List<JobResult<*>>> {
                 it.size == msgCount
             })
@@ -283,53 +271,5 @@ class SqsMsgServiceTest : BaseTest() {
                 it.queueUrl() == QUEUE_URL && entries.size == msgCount
             })
         }
-    }
-
-    private fun mockCommonSqsClient() {
-        val deleteSlot = slot<Consumer<DeleteMessageRequest.Builder>>()
-        every { sqsClient.deleteMessage(capture(deleteSlot)) } answers {
-            callOriginal()
-        }
-    }
-
-    private fun mockReceiveMessageResponse(
-        jobId: String = "jobId",
-        taskId: String? = null,
-        body: String? = null,
-        receiptHandle: String = "receipt",
-        msgCount: Int = 1
-    ) {
-        val response = ReceiveMessageResponse.builder()
-            .messages(
-                List(msgCount) {
-                    Message.builder()
-                        .messageId("$jobId-$it")
-                        .apply {
-                            taskId?.let {
-                                attributes(mapOf(MessageSystemAttributeName.MESSAGE_GROUP_ID to it))
-                            }
-                        }
-                        .apply {
-                            body?.also { body(it) }
-                        }
-                        .receiptHandle(receiptHandle)
-                        .build()
-                }
-            )
-            .build()
-        every { sqsClient.receiveMessage(any<ReceiveMessageRequest>()) } returnsMany listOf<CompletableFuture<ReceiveMessageResponse>>(
-            CompletableFuture.completedFuture(response),
-            CompletableFuture.supplyAsync {
-                Thread.sleep(SqsMsgService.TIMEOUT_RESULT_COLLECTION * 2) // to ensure the error happens only after results are pushed
-                error("Dummy error to mark failure on receiving messages")
-            }
-        )
-    }
-
-    companion object {
-        private const val QUEUE_URL = "sqs://queue"
-        private const val DELAY_WAIT = 1000L
-
-        private val VISIBILITY_TIMEOUT: Long = TimeUnit.SECONDS.toSeconds(5)
     }
 }

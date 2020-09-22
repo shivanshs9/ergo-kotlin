@@ -6,6 +6,10 @@ import kotlin.reflect.KClass
 /**
  * Created by shivanshs9 on 13/07/20.
  */
+
+/**
+ * Supports spring beans and gets the instance using cached spring application context
+ */
 class SpringInstanceLocator : InstanceLocator {
     override fun <T : Any> getInstance(clazz: KClass<T>): T? {
         val isSpringBean = clazz.annotations.filter {
