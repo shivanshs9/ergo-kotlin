@@ -4,6 +4,7 @@ import publish.GithubPackage
 plugins {
     kotlinJvm()
     kotlinKapt()
+    kotlinDoc()
 }
 
 dependencies {
