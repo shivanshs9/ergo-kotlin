@@ -66,7 +66,7 @@ class SqsMsgService(
      * result handler and visibility timeout of the request queue.
      */
     override suspend fun initService() {
-        resultHandler.init(this) { pushResults(it) }
+        resultHandler.init(this, jobController.parser) { pushResults(it) }
         visibilityTimeout = defaultVisibilityTimeout?.also {
             logger.info { "Using the visibility timeout of $it seconds" }
         } ?: sqs.runCatching {

@@ -1,5 +1,6 @@
 package headout.oss.ergo.helpers
 
+import headout.oss.ergo.factory.IJobParser
 import headout.oss.ergo.models.JobResult
 import headout.oss.ergo.services.BaseMsgService
 import headout.oss.ergo.utils.repeatUntilCancelled
@@ -36,7 +37,11 @@ class InMemoryBufferJobResultHandler(
 
     private val bufferedResults = mutableListOf<JobResult<*>>()
 
-    override fun init(scope: CoroutineScope, pushResultsImpl: suspend (List<JobResult<*>>) -> Unit) {
+    override fun init(
+        scope: CoroutineScope,
+        jobParser: IJobParser,
+        pushResultsImpl: suspend (List<JobResult<*>>) -> Unit
+    ) {
         implPushResults = pushResultsImpl
         timeoutResultCollect = scope.ticker(timeoutCollectResult)
         handleBufferTimeout(scope)

@@ -1,5 +1,6 @@
 package headout.oss.ergo.helpers
 
+import headout.oss.ergo.factory.IJobParser
 import headout.oss.ergo.models.JobResult
 import kotlinx.coroutines.CoroutineScope
 
@@ -10,10 +11,10 @@ import kotlinx.coroutines.CoroutineScope
 /**
  * Defines an handler to handle job result after execution
  *
- * It's upto the implementation to decide when to push the results
+ * It's upto the implementation used in message service to decide when to push the results
  */
 interface JobResultHandler {
-    fun init(scope: CoroutineScope, pushResultsImpl: suspend (List<JobResult<*>>) -> Unit)
+    fun init(scope: CoroutineScope, jobParser: IJobParser, pushResultsImpl: suspend (List<JobResult<*>>) -> Unit)
 
     suspend fun handleResult(result: JobResult<*>): Boolean
 }
