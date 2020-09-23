@@ -13,6 +13,8 @@ interface IJobParser {
 
     fun serializeJobResult(jobResult: JobResult<*>): String
 
+    fun deserializeJobResult(taskId: TaskId, rawData: String): JobResult<*>
+
     fun newTaskController(
         taskId: TaskId,
         jobId: JobId,

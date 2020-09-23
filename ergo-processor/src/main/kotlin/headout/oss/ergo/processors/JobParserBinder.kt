@@ -1,12 +1,10 @@
 package headout.oss.ergo.processors
 
-import com.squareup.kotlinpoet.FileSpec
-import com.squareup.kotlinpoet.MemberName
+import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
-import com.squareup.kotlinpoet.TypeSpec
-import com.squareup.kotlinpoet.asClassName
 import headout.oss.ergo.codegen.api.TypeGenerator
 import headout.oss.ergo.codegen.task.TaskControllerGenerator
+import headout.oss.ergo.codegen.task.TaskMethodGenerator
 import headout.oss.ergo.exceptions.ExceptionUtils
 import headout.oss.ergo.factory.IJobParser
 import headout.oss.ergo.factory.JsonFactory
@@ -38,6 +36,7 @@ class JobParserBinder(
         .addFunction(createParseRequestDataFunction())
         .addFunction(createNewTaskControllerFunction())
         .addFunction(createSerializeJobResultFunction())
+        .addFunction(createDeserializeJobResultFunction())
         .build()
 
     private fun createParseRequestDataFunction() = jobParserApi.overrideFunction("parseRequestData")
@@ -94,32 +93,7 @@ class JobParserBinder(
             val jobResultClass = JobResult::class.asClassName()
             bindingMap.values.forEach { controllerBind ->
                 controllerBind.tasks.forEach { taskBind ->
-                    val resultClass = taskBind.targetMethod.returnType
-                    val resultSerializer = BUILTIN_SERIALIZERS[resultClass]
-                    val paramJobResultClass = jobResultClass.parameterizedBy(resultClass)
-                    beginControlFlow("%S ->", taskBind.task.taskId)
-                    if (resultSerializer != null) {
-                        if (resultSerializer == companionSerializerFunction) addStatement(
-                            "val serializer = %T.serializer(%T.%M())",
-                            jobResultClass,
-                            resultClass,
-                            resultSerializer
-                        )
-                        else addStatement(
-                            "val serializer = %T.serializer(%M())",
-                            jobResultClass,
-                            resultSerializer
-                        )
-                    } else {
-//                        require(resultClass.annotations.find { it.className == serializableClassName } != null) {
-//                            "Return type $resultClass of ${taskBind.method.name} must be annotated with $serializableClassName"
-//                        }
-                        addStatement(
-                            "val serializer = %T.serializer(%T.serializer())",
-                            jobResultClass,
-                            resultClass
-                        )
-                    }
+                    val paramJobResultClass = addSerializerForTask(taskBind, jobResultClass)
                     addStatement("%M.stringify(serializer, %N as %T)", jsonRef, "jobResult", paramJobResultClass)
                     endControlFlow()
                 }
@@ -135,6 +109,63 @@ class JobParserBinder(
         }
         .endControlFlow()
         .build()
+
+    private fun createDeserializeJobResultFunction() = jobParserApi.overrideFunction("deserializeJobResult")
+        .beginControlFlow("return when (%N)", "taskId")
+        .apply {
+            val jsonRef = MemberName(JsonFactory::class.asClassName(), "json")
+            val jobResultClass = JobResult::class.asClassName()
+            bindingMap.values.forEach { controllerBind ->
+                controllerBind.tasks.forEach { taskBind ->
+                    addSerializerForTask(taskBind, jobResultClass)
+                    addStatement("%M.parse(%N, %N)", jsonRef, "serializer", "rawData")
+                    endControlFlow()
+                }
+            }
+            beginControlFlow("else ->")
+            addStatement(
+                "val serializer = %T.serializer(%M())",
+                jobResultClass,
+                BUILTIN_SERIALIZERS.getValue(Unit::class.asClassName())
+            )
+            addStatement("%M.parse(%N, %N)", jsonRef, "serializer", "rawData")
+            endControlFlow()
+        }
+        .endControlFlow()
+        .build()
+
+    private fun FunSpec.Builder.addSerializerForTask(
+        taskBind: TaskMethodGenerator,
+        jobResultClass: ClassName
+    ): ParameterizedTypeName {
+        val resultClass = taskBind.targetMethod.returnType
+        val resultSerializer = BUILTIN_SERIALIZERS[resultClass]
+        val paramJobResultClass = jobResultClass.parameterizedBy(resultClass)
+        beginControlFlow("%S ->", taskBind.task.taskId)
+        if (resultSerializer != null) {
+            if (resultSerializer == companionSerializerFunction) addStatement(
+                "val serializer = %T.serializer(%T.%M())",
+                jobResultClass,
+                resultClass,
+                resultSerializer
+            )
+            else addStatement(
+                "val serializer = %T.serializer(%M())",
+                jobResultClass,
+                resultSerializer
+            )
+        } else {
+//            require(resultClass.annotations.find { it.className == serializableClassName } != null) {
+//                "Return type $resultClass of ${taskBind.method.name} must be annotated with $serializableClassName"
+//            }
+            addStatement(
+                "val serializer = %T.serializer(%T.serializer())",
+                jobResultClass,
+                resultClass
+            )
+        }
+        return paramJobResultClass
+    }
 
     companion object {
         private val companionSerializerFunction = MemberName("kotlinx.serialization.builtins", "serializer")
