@@ -52,11 +52,11 @@ val service = SqsMsgService(
 
 #### Existing Result Handlers:
 
-- **[ImmediateRespondJobResultHandler](src/main/kotlin/headout/oss/ergo/helpers/ImmediateRespondJobResultHandler.kt):**
+- **[ImmediateRespondJobResultHandler](//github.com/headout/ergo-kotlin/src/main/kotlin/headout/oss/ergo/helpers/ImmediateRespondJobResultHandler.kt):**
 Pushes the result as soon as the job is finished/errored.
 It may be SQS request-intensive on the result queue.
 
-- **[InMemoryBufferJobResultHandler](src/main/kotlin/headout/oss/ergo/helpers/InMemoryBufferJobResultHandler.kt):** (default)
+- **[InMemoryBufferJobResultHandler](//github.com/headout/ergo-kotlin/src/main/kotlin/headout/oss/ergo/helpers/InMemoryBufferJobResultHandler.kt):** (default)
 Supports batching of job results and pushes in bulk upto 10 messages at a time.
 
 ### Architecture

@@ -156,13 +156,13 @@ Refer to [Samples](sample) to check out example usages.
 
 #### Terminology
 
-- Task => used to denote an executable function with given input and given output
+1. **Task =>** used to denote an executable function with given input and given output
   - Has TaskId to uniquely differentiate tasks
   - Can be used to refer to both regular and suspending functions
   - Function Parameters must be serializable (using @Serializable on the data class)
   - The task function can either be regular or suspending function, and its return type is the job result type too (which must again be serializable)
-- TaskId => name to map to a particular function (must be unique in project).
+2. **TaskId =>** name to map to a particular function (must be unique in project).
   - For SQS FIFO queues, it is analogous to **MessageGroupId**
   - For Pulsar, it is analogous to **Topic**
-- JobId => uniquely generated from the sender side to denote a particular running instance of a task.
+3. **JobId =>** uniquely generated from the sender side to denote a particular running instance of a task.
   - For SQS queues, it is analogous to **MessageId**

@@ -4,7 +4,7 @@ You can find some sample tasks to help guide you in integrating ergo-kotlin in y
 
 ### Providing Task Metadata in codebase
 
-You can find some [sample task definitions](src/main/kotlin/headout/oss/ergo/ExampleTasks.kt) for static functions and suspending functions.
+You can find some [sample task definitions](//github.com/headout/ergo-kotlin/src/main/kotlin/headout/oss/ergo/ExampleTasks.kt) for static functions and suspending functions.
 
 - Annotate the relevant functions with `Task` and provide a suitable **taskId** as argument (will be later used in code generation to map the taskId to this function call)
 
@@ -56,13 +56,13 @@ class ExampleTasks {
 ```
 
 ### Spring Tasks
-You can find some [sample task defintions](src/main/kotlin/headout/oss/ergo/SpringTasks.kt) for a task in spring service.
+You can find some [sample task defintions](//github.com/headout/ergo-kotlin/src/main/kotlin/headout/oss/ergo/SpringTasks.kt) for a task in spring service.
 The constructor also has an `@Autowired` property for a sample spring bean.
 
 ### Using Ergo's Message Service
 
 #### 1. SQS service
-You can find the sample code for service [here](src/main/kotlin/headout/oss/ergo/Runtime.kt).
+You can find the sample code for service [here](//github.com/headout/ergo-kotlin/src/main/kotlin/headout/oss/ergo/Runtime.kt).
 
 - Create SQS client and SQS Message Service (with default number of workers, 8, and result handler, In-Memory Buffer Results):
 
