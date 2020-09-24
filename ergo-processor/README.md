@@ -1,11 +1,14 @@
-# Module ergo-processor
+## ergo-processor
 
 Kapt-enabled module to run annotation processor, on compilation, used to generate required **TaskController** subclasses
 for parsing of request data, validation and execution of task 
 
-#### Add dependencies to Ergo annotation processor:
+### Installation
 
-Add following to Gradle (build.gradle.kts):
+Add following to Gradle:
+
+<details open>
+<summary>Kotlin DSL (build.gradle.kts)</summary>
 
 ```kotlin
 plugins {
@@ -13,6 +16,23 @@ plugins {
 }
 
 dependencies {
-  kapt("com.github.headout.ergo-kotlin:ergo-processor:$ergoVersion")
+  kapt("com.github.headout.ergo-kotlin:ergo-processor:1.2.0")
 }
 ```
+
+</details>
+
+<details>
+<summary>Groovy (build.gradle)</summary>
+
+```gradle
+plugins {
+  id 'org.jetbrains.kotlin.kapt' version kotlinVersion // Enable kapt plugin for annotation processing
+}
+
+dependencies {
+  kapt "com.github.headout.ergo-kotlin:ergo-processor:1.2.0"
+}
+```
+
+</details>

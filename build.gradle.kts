@@ -29,14 +29,15 @@ subprojects {
         dokkaSourceSets {
             register("main") {
                 sourceRoot("src/main")
-                includes.from("README.md")
+                includes.from("DOC.md")
             }
         }
     }
 }
 
 tasks.dokkaHtmlMultiModule.configure {
-    documentationFileName.set("README.md")
+    outputDirectory.set(rootDir.resolve("docs/api"))
+    documentationFileName.set("DOC.md")
 }
 
 repositories {
