@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.2.0](https://github.com/headout/ergo-kotlin/compare/v1.1.5...v1.2.0) (2020-09-24)
+
+
+### Features
+
+* add immediate respond result handler ([80daf60](https://github.com/headout/ergo-kotlin/commit/80daf60362b735d4a632b9d53114eed17854eda3))
+* add jobParser to job result handlers ([f1350af](https://github.com/headout/ergo-kotlin/commit/f1350af06f2a70bb87d7706f09b58d7485a81370))
+* added dokka plugin for doc generation ([2b2845e](https://github.com/headout/ergo-kotlin/commit/2b2845e44ed40dce409048024b3e98bc096f3557))
+* generate deserializeJobResult in job parser ([f62fc95](https://github.com/headout/ergo-kotlin/commit/f62fc9546f68724e5daf415e3aab7e2c91909429))
+* modularize result handler to give flexibility to client ([771cc93](https://github.com/headout/ergo-kotlin/commit/771cc934efe666fe7f8479cd6a8aff3732559bae))
+
+
+### Bug Fixes
+
+* fixed tests for sqs service with buffered results ([6cf387a](https://github.com/headout/ergo-kotlin/commit/6cf387ac5905744fc4b757e9b983a30c845ab820))
+
 ### [1.1.5](https://github.com/headout/ergo-kotlin/compare/v1.1.4...v1.1.5) (2020-09-24)
 
 
