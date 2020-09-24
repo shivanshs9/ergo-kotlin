@@ -3,6 +3,7 @@ import publish.GithubPackage
 
 plugins {
     kotlinJvm()
+    kotlinDoc()
 }
 
 dependencies {

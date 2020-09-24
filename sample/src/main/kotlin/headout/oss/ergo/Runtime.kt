@@ -8,17 +8,18 @@ import software.amazon.awssdk.services.sqs.SqsAsyncClient
 import software.amazon.awssdk.services.sqs.SqsClient
 import software.amazon.awssdk.services.sqs.model.SendMessageRequest
 import java.net.URI
+import java.util.*
 
 /**
  * Created by shivanshs9 on 05/06/20.
  */
-val TASKS = listOf("spring_optionalArg", "suspend_oneArg")
+val TASKS = listOf("suspend_oneArg.1", "suspend_oneArg.2", "suspend_oneArg.3")
 val TASK_BODIES = listOf(
     "{}", "{\"num\": 3}"
 )
 val LOCAL_REGION: Region = Region.of("default")
 val LOCAL_ENDPOINT: URI = URI.create("http://localhost:9324")
-const val QUEUE_URL = "http://localhost:9324/queue/fifo_req"
+const val QUEUE_URL = "http://localhost:9324/queue/fifo_req_calipso"
 const val RESULT_QUEUE_URL = "http://localhost:9324/queue/fifo_res"
 
 fun CoroutineScope.produceTasks() = launch {
@@ -35,7 +36,7 @@ fun CoroutineScope.produceTasks() = launch {
             .messageGroupId(TASKS[taskIndex])
             .messageBody(TASK_BODIES.random())
             .queueUrl(QUEUE_URL)
-            .messageDeduplicationId(i.toString())
+            .messageDeduplicationId(Calendar.getInstance().timeInMillis.toString())
             .build()
         val id = sqsClient.sendMessage(sendMsg).messageId()
         println("Message sent with id: $id")
@@ -45,8 +46,8 @@ fun CoroutineScope.produceTasks() = launch {
 }
 
 fun main() = runBlocking {
-    val springApp = MySpringApplication()
-    springApp.main()
+//    val springApp = MySpringApplication()
+//    springApp.main()
 
     println("${Thread.currentThread().name} Starting program")
     val job = produceTasks()
@@ -66,7 +67,7 @@ fun main() = runBlocking {
         override fun run() {
             super.run()
             service.stop()
-            springApp.stop()
+//            springApp.stop()
             job.cancel()
         }
     })

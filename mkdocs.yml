@@ -1,0 +1,64 @@
+site_name: 'Ergo Kotlin'
+site_description: 'A Kotlin library to handle tasks offloaded to distributed clients.'
+site_author: 'Shivansh Saini'
+site_url: 'https://headout.github.io/ergo-kotlin'
+remote_branch: gh-pages
+
+repo_name: 'ergo-kotlin'
+repo_url: 'https://github.com/headout/ergo-kotlin'
+
+copyright: 'Copyright &copy; 2020 Headout'
+
+theme:
+  name: 'material'
+  language: 'en'
+  favicon: 'images/headout_logo.png'
+  logo: 'images/headout_logo.png'
+  palette:
+    primary: 'white'
+    accent: 'white'
+  font:
+    text: 'Fira Sans'
+    code: 'Fira Code'
+  icon:
+    repo: fontawesome/brands/github
+
+extra:
+  social:
+    - icon: 'fontawesome/brands/github'
+      link: 'https://github.com/headout/ergo-kotlin'
+
+nav:
+  - 'Overview': index.md
+  - 'Sample': sample/index.md
+  - 'Ergo Annotations': ergo-annotations/index.md
+  - 'Ergo Processor': ergo-processor/index.md
+  - 'Ergo Runtime': ergo-runtime/index.md
+  - 'Ergo SQS Service': ergo-service-sqs/index.md
+  - 'Change Log': changelog.md
+  - 'API Docs': api/-modules.html" target="_blank
+
+markdown_extensions:
+  - admonition
+  - smarty
+  - codehilite:
+      guess_lang: false
+      linenums: True
+  - footnotes
+  - meta
+  - toc:
+      permalink: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.inlinehilite
+  - pymdownx.magiclink
+  - pymdownx.smartsymbols
+  - pymdownx.superfences
+  - tables
+
+plugins:
+  - search
+  - minify:
+      minify_html: true

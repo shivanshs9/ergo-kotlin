@@ -1,5 +1,9 @@
+plugins {
+    id("org.jetbrains.dokka") version "1.4.0"
+}
+
 allprojects {
-    apply(plugin="maven-publish")
+    apply(plugin = "maven-publish")
 
     repositories {
         mavenCentral()
@@ -18,6 +22,22 @@ allprojects {
         set("deps.coroutine", "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.3.7")
         set("deps.coroutine-jdk8", "org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.3.7")
     }
+}
+
+subprojects {
+    tasks.withType<org.jetbrains.dokka.gradle.DokkaTask>().configureEach {
+        dokkaSourceSets {
+            register("main") {
+                sourceRoot("src/main")
+                includes.from("DOC.md")
+            }
+        }
+    }
+}
+
+tasks.dokkaHtmlMultiModule.configure {
+    outputDirectory.set(rootDir.resolve("docs/api"))
+    documentationFileName.set("DOC.md")
 }
 
 repositories {
